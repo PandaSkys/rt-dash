@@ -1,0 +1,108 @@
+# Déploiement continu (design § 14).
+# 1. Après une CI verte sur main (ou à la main) : image construite et publiée sur GHCR.
+# 2. Migrations, premier superadmin et mise à jour du VPS : écrits, mais actifs
+#    seulement quand la variable du dépôt DEPLOY_ENABLED vaut « true » (phase 11).
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Empreinte (sha) d'une image déjà publiée à redéployer ; vide = commit courant"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/rt-dash
+
+jobs:
+  image:
+    name: Image GHCR
+    # Seulement si la CI est verte, et jamais pour un redéploiement d'image existante.
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.tag == '')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.sha.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - id: sha
+        run: echo "tag=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Nom de l'image en minuscules (exigé par GHCR)
+        run: echo "IMAGE=${IMAGE,,}" >> "$GITHUB_ENV"
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.sha.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+
+  deploy:
+    name: Migrations et mise à jour du VPS
+    needs: image
+    # `always()` permet de redéployer une image existante (job image ignoré).
+    if: >
+      always() && vars.DEPLOY_ENABLED == 'true' &&
+      (needs.image.result == 'success' || (needs.image.result == 'skipped' && inputs.tag != ''))
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      TAG: ${{ inputs.tag || needs.image.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
+        with:
+          version: 3.0.0
+      - name: "Migrations de la base (pooler en mode session, IPv4, L-02)"
+        run: supabase db push --db-url "$DATABASE_URL_MIGRATIONS"
+        env:
+          DATABASE_URL_MIGRATIONS: ${{ secrets.DATABASE_URL_MIGRATIONS }}
+      - name: Premier superadmin (sans effet s'il en existe déjà un actif)
+        run: >
+          psql "$DATABASE_URL_MIGRATIONS" -v ON_ERROR_STOP=1
+          -v discord_id="$BOOTSTRAP_SUPERADMIN_DISCORD_ID"
+          -c "select rtdash.bootstrap_superadmin(:'discord_id')"
+        env:
+          DATABASE_URL_MIGRATIONS: ${{ secrets.DATABASE_URL_MIGRATIONS }}
+          BOOTSTRAP_SUPERADMIN_DISCORD_ID: ${{ secrets.BOOTSTRAP_SUPERADMIN_DISCORD_ID }}
+      - name: Mise à jour du VPS par SSH (empreinte du serveur vérifiée)
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
+            "cd ~/rt-dash && TAG=$TAG docker compose pull app && TAG=$TAG docker compose up -d"
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+      - name: Le site répond
+        run: curl --fail --silent --show-error --retry 10 --retry-delay 6 --retry-all-errors "$APP_URL/api/health"
+        env:
+          APP_URL: ${{ vars.APP_URL }}

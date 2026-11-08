@@ -284,3 +284,66 @@ Fait le 2026-11-08 : tout est conforme ; la page `/` s'affiche malgré le systè
 
 **Écarts avec les documents**
 - Le Dockerfile fixe aussi `pnpm@11.20.0` : la version figure donc à deux endroits (`package.json` et `Dockerfile`). Dependabot devra mettre à jour les deux.
+
+**Vérifié sur GitHub (2026-11-08)**
+- Commit `3c2b0c0` sur `main` : les trois jobs sont **verts** (exécution 42501750607).
+- Branche jetable `test/gitleaks` avec un faux jeton GitHub : le job « Qualité » **échoue à l'étape gitleaks**, les deux autres restent verts (exécution 42501805078). Branche supprimée ensuite, en local et sur GitHub, avec l'accord de l'utilisateur. Le faux jeton est inventé : il ne donne accès à rien.
+- `actionlint` (vérificateur de workflows) : aucune erreur.
+
+**Tests** : `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅ · `pnpm test` ✅ · `pnpm test:e2e` ✅ · CI GitHub ✅
+
+**Hors périmètre, non fait** : aucun.
+
+**Points ouverts**
+- La protection de `main` (CI obligatoire, commits signés, T-1.2) peut maintenant être posée : les trois vérifications existent. À faire avec l'utilisateur.
+
+**Relecture**
+- [x] Workflow relu ; commentaires limités au « pourquoi ».
+
+---
+
+## T-1.10 — `deploy.yml` (image GHCR) · 2026-11-08
+
+**En clair** : quand la CI est verte sur `main`, ce second robot fabrique l'image Docker et la range dans le registre de GitHub (GHCR) sous deux noms : l'empreinte du commit (`:3c2b0c0…`, pour revenir à une version précise) et `:latest`. La suite (migrations de la base, premier superadmin, mise à jour du VPS par SSH, contrôle de `/api/health`) est **déjà écrite mais désactivée** : elle ne tourne que si la variable du dépôt `DEPLOY_ENABLED` vaut `true` (phase 11).
+
+**Ce qui a été fait**
+- Déclenché par la fin de la CI sur `main` (seulement si elle est verte), ou à la main avec une empreinte pour **redéployer une image existante** sans la reconstruire.
+- Droits minimaux : écriture des paquets (GHCR) uniquement pour le job de l'image ; secrets dans l'environnement GitHub `production` ; empreinte SSH du VPS vérifiée (`StrictHostKeyChecking=yes`).
+- Deux déploiements ne se chevauchent jamais (`concurrency`).
+- Actions épinglées par empreinte (L-05). `actionlint` : aucune erreur.
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `.github/workflows/deploy.yml` | créé | publication de l'image, déploiement préparé |
+| `docs/tasks.md` | modifié | T-1.10 cochée une fois l'image visible dans GHCR |
+
+**Écarts avec les documents**
+- Le nom de l'image est passé en minuscules automatiquement (GHCR l'exige ; le propriétaire est `PandaSkys`).
+- La version de la CLI Supabase du déploiement (3.0.0) est provisoire : à aligner en T-2.1 sur celle utilisée en local.
+- L'étape « premier superadmin » appelle `rtdash.bootstrap_superadmin`, qui n'existera qu'en phase 3 ; sans effet tant que `DEPLOY_ENABLED` n'est pas activé.
+
+---
+
+## T-1.11 — `README.md` · 2026-11-08
+
+**Ce qui a été fait** : lancer en local, vérifications (mêmes commandes qu'en CI), Docker, variables (renvoi vers `.env.example`), CI/CD, liens vers `docs/` et `CLAUDE.md`.
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `README.md` | créé | point d'entrée du dépôt |
+| `docs/tasks.md` | modifié | T-1.11 cochée |
+
+---
+
+## T-1.12 — Dependabot · 2026-11-08
+
+**En clair** : Dependabot surveille chaque semaine nos dépendances (npm/pnpm), l'image Docker de base, l'image Caddy et les actions GitHub, et ouvre une pull request quand une mise à jour existe. La CI la vérifie ; on fusionne si elle est verte. Il attend **3 jours** après la sortie d'une version avant de la proposer (L-05). Les petites mises à jour des outils de développement sont regroupées en une seule pull request.
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `.github/dependabot.yml` | créé | configuration des mises à jour |
+| `docs/tasks.md` | modifié | T-1.12 cochée une fois les alertes activées |
+
+**Reste à faire** : activer dans les réglages du dépôt les **alertes de sécurité Dependabot** et les **mises à jour de sécurité** (modification des réglages GitHub, avec l'accord de l'utilisateur).

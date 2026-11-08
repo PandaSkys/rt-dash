@@ -1,0 +1,36 @@
+# Mises à jour proposées par Dependabot (design § 16.1, couche 10).
+# `cooldown` : une nouvelle version n'est proposée qu'après 3 jours (L-05),
+# le temps qu'une version piégée soit repérée et retirée.
+version: 2
+updates:
+  - package-ecosystem: npm # couvre pnpm (pnpm-lock.yaml)
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    groups:
+      dependances-de-developpement:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker # image de base du Dockerfile
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+
+  - package-ecosystem: docker-compose # image Caddy
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+
+  - package-ecosystem: github-actions # actions épinglées par empreinte
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
