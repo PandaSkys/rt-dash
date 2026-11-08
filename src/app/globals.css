@@ -1,0 +1,31 @@
+/*
+ * Tokens de design (design § 10). Sous-ensemble posé en T-2.4 pour la page de connexion,
+ * valeurs identiques au design ; T-4.1 complète ce fichier (Tailwind, shadcn, police).
+ */
+:root {
+  /* — Palette officielle RT-Dash — */
+  --rt-yellow: #f8c032;
+  --rt-black: #1f1f1f;
+
+  /* — Teintes dérivées (maquette) — */
+  --rt-page: #171717;
+  --rt-surface: var(--rt-black);
+  --rt-border: #2e2e2e;
+  --rt-text: #f4f4f4;
+  --rt-text-label: #c4c4ca;
+  --rt-status-refused-fg: #f28b82;
+  --rt-on-accent: var(--rt-black); /* texte foncé sur jaune et violet */
+
+  /* — Rayons — */
+  --rt-radius-dialog: 26px;
+  --rt-radius-pill: 9999px;
+
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--rt-page);
+  color: var(--rt-text);
+  font-family: system-ui, sans-serif;
+}

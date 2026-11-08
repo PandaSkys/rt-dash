@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import "./globals.css";
 
 // Dynamique : le nonce de la CSP change à chaque requête.
 export const dynamic = "force-dynamic";

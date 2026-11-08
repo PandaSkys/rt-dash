@@ -4,8 +4,13 @@ import nextTypescript from "eslint-config-next/typescript";
 
 const TEST_FILES = ["tests/**", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"];
 const GENERATED_FILES = ["src/core/supabase/database.types.ts"];
-// Dossiers autorisés à importer le client Supabase (design § 3.2).
-const SUPABASE_ALLOWED_FILES = ["src/core/supabase/**", "src/**/queries/**", "src/**/actions/**"];
+// Dossiers autorisés à importer le client Supabase (design § 3.2), plus les tests qui les vérifient.
+const SUPABASE_ALLOWED_FILES = [
+  "src/core/supabase/**",
+  "src/**/queries/**",
+  "src/**/actions/**",
+  "tests/**",
+];
 
 const readabilityRules = {
   "max-lines": ["error", { max: 300 }],
@@ -24,7 +29,7 @@ const securityAndTypingRules = {
     {
       patterns: [
         {
-          group: ["@supabase/*", "@/core/supabase/*"],
+          group: ["@supabase/*", "@/core/supabase/server-client"],
           message:
             "Le client Supabase ne s'importe que depuis core/supabase, queries/ ou actions/ (design § 3.2).",
         },

@@ -16,12 +16,18 @@
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration --passWithNoTests",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > src/core/supabase/database.types.ts",
+    "db:test": "supabase test db"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0",
     "next": "16.4.5",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "server-only": "0.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",
@@ -38,6 +44,7 @@
     "eslint-plugin-import": "^2.32.0",
     "jsdom": "^31.0.0",
     "prettier": "^3.9.10",
+    "supabase": "3.0.0",
     "typescript": "~5.9.3",
     "vitest": "^5.1.0",
     "yaml": "^2.9.1"

@@ -1,4 +1,8 @@
-// La vérification de Supabase s'ajoutera en phase 2 (T-2.4).
-export function GET() {
-  return Response.json({ status: "ok" });
+import { isSupabaseReachable } from "@/core/supabase/supabase-health";
+
+export async function GET() {
+  if (await isSupabaseReachable()) {
+    return Response.json({ status: "ok", supabase: "ok" });
+  }
+  return Response.json({ status: "error", supabase: "unreachable" }, { status: 503 });
 }

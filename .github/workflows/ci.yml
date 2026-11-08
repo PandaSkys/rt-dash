@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Services de Supabase local inutiles aux tests : démarrage plus rapide.
+  SUPABASE_UNUSED_SERVICES: realtime,imgproxy,mailpit,studio,edge-runtime,logflare,vector,supavisor
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -43,7 +47,34 @@ jobs:
             echo "::error::Variable interdite trouvée dans src/"
             exit 1
           fi
-      - run: pnpm test
+      - run: pnpm test:unit
+
+  database:
+    name: Base de données et tests d'intégration
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Supabase local (services utiles aux tests seulement)
+        run: pnpm exec supabase start --exclude ${{ env.SUPABASE_UNUSED_SERVICES }}
+      - name: Migrations rejouées depuis zéro
+        run: pnpm db:reset
+      - name: Tests de la base (pgTAP, design § 6.6)
+        run: pnpm db:test
+      - name: Tests d'intégration (Supabase local complet, L-07)
+        run: pnpm test:integration
+      - name: Types générés à jour
+        run: |
+          pnpm db:types
+          if ! git diff --exit-code -- src/core/supabase/database.types.ts; then
+            echo "::error::Types non à jour : lancer pnpm db:types et commiter le résultat."
+            exit 1
+          fi
 
   e2e:
     name: Build et tests de bout en bout
@@ -57,6 +88,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Supabase local (services utiles aux tests seulement)
+        run: pnpm exec supabase start --exclude ${{ env.SUPABASE_UNUSED_SERVICES }}
       - name: Build de production puis tests e2e
         run: pnpm test:e2e
       - if: failure()

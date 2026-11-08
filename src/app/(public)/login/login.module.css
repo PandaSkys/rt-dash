@@ -1,0 +1,72 @@
+/* Même carte que la maquette « Acces » (460 px, filet jaune, logo 260 px, bouton en pilule). */
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--rt-surface);
+  border: 1px solid var(--rt-border);
+  border-top: 4px solid var(--rt-yellow);
+  border-radius: var(--rt-radius-dialog);
+  padding: 32px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.logo {
+  width: 260px;
+  max-width: 100%;
+  height: auto;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.text {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rt-text-label);
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rt-status-refused-fg);
+}
+
+.button {
+  border: 0;
+  background: var(--rt-yellow);
+  color: var(--rt-on-accent);
+  font: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  border-radius: var(--rt-radius-pill);
+  padding: 12px 26px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.button:hover {
+  filter: brightness(1.08);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--rt-yellow);
+  outline-offset: 2px;
+}
