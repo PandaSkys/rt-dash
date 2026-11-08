@@ -324,6 +324,8 @@ Fait le 2026-11-08 : tout est conforme ; la page `/` s'affiche malgré le systè
 - La version de la CLI Supabase du déploiement (3.0.0) est provisoire : à aligner en T-2.1 sur celle utilisée en local.
 - L'étape « premier superadmin » appelle `rtdash.bootstrap_superadmin`, qui n'existera qu'en phase 3 ; sans effet tant que `DEPLOY_ENABLED` n'est pas activé.
 
+**Premier essai sur GitHub (commit `26aff14`, 2026-11-08)** : CI verte ; `deploy.yml` échoue au push de l'image : `denied: permission_denied: read_package`. Cause probable : un paquet GHCR `rt-dash` existe encore depuis la première tentative, rattaché à l'ancien dépôt supprimé ; le nouveau dépôt n'a donc pas le droit d'y écrire. Confirmé : supprimer l'ancien dépôt ne suffisait pas, le paquet survivait. L'utilisateur a **supprimé l'ancien paquet** ; workflow relancé sans nouveau commit : **image publiée** `ghcr.io/pandaskys/rt-dash:26aff14a8f4c8dffc08e3b219e0d877664b5fb88` et `:latest` (même empreinte `sha256:b9a3d567…`). Le job « Migrations et mise à jour du VPS » est bien ignoré (`DEPLOY_ENABLED` non défini).
+
 ---
 
 ## T-1.11 — `README.md` · 2026-11-08
@@ -346,4 +348,35 @@ Fait le 2026-11-08 : tout est conforme ; la page `/` s'affiche malgré le systè
 | `.github/dependabot.yml` | créé | configuration des mises à jour |
 | `docs/tasks.md` | modifié | T-1.12 cochée une fois les alertes activées |
 
-**Reste à faire** : activer dans les réglages du dépôt les **alertes de sécurité Dependabot** et les **mises à jour de sécurité** (modification des réglages GitHub, avec l'accord de l'utilisateur).
+**Fait avec l'accord de l'utilisateur** : alertes de vulnérabilité Dependabot et mises à jour de sécurité **activées** sur le dépôt (vérifié par l'API GitHub). Le scan des secrets et la protection au push étaient déjà actifs.
+
+**Relecture**
+- [x] Fichiers relus.
+
+---
+
+## Bilan de la phase 1 · 2026-11-08
+
+**Résumé** : le socle est en place. Next.js 16 en TypeScript strict, avec des garde-fous de lisibilité et de sécurité appliqués par ESLint (zéro avertissement). Tests unitaires (Vitest) et de bout en bout (Playwright, sur le serveur de production). En-têtes de sécurité et CSP avec nonce. Image Docker durcie, servie derrière Caddy en HTTPS. CI à trois vérifications sur chaque push, publication automatique de l'image sur GHCR, Dependabot.
+
+**Tâches** : T-1.1 ✅ · T-1.2 ⚠️ (tout sauf la protection de `main`) · T-1.3 ✅ · T-1.4 ✅ · T-1.5 ✅ · T-1.6 ✅ · T-1.7 ✅ · T-1.8 ✅ · T-1.9 ✅ · T-1.10 ✅ · T-1.11 ✅ · T-1.12 ✅
+
+**Leçons appliquées** : L-04 (pas de `serverActions.allowedOrigins`) · L-05 (actions et images épinglées par empreinte, Dependabot avec 3 jours de délai) · L-06 (npm, corepack et yarn retirés de l'image ; Trivy vert ; mécanisme d'exceptions de `pnpm audit` prêt, aucune nécessaire) · L-08 (CI sur chaque push, toutes branches).
+
+**Démonstration**
+- `pnpm dev` → http://localhost:3000 ; `pnpm lint`, `pnpm typecheck`, `pnpm test` (16 tests), `pnpm test:e2e` (6 tests).
+- Onglet *Actions* du dépôt : CI verte sur `3c2b0c0` et `26aff14` ; échec voulu de gitleaks sur la branche de test (supprimée).
+- Image : `ghcr.io/pandaskys/rt-dash:latest`.
+
+**Captures** : aucun écran dans cette phase.
+
+**Commits** : `d93a132` (socle), `3c2b0c0` (T-1.3 à T-1.9), `26aff14` (T-1.10 à T-1.12), tous signés. Les mises à jour de ce compte rendu et de `tasks.md` faites après `26aff14` ne sont pas encore commitées.
+
+**Reste à faire / risques**
+- **Protection de `main`** (T-1.2) : non posée, au choix de l'utilisateur. Sans elle, un push direct sur `main` reste possible même si la CI échoue.
+- Le paquet GHCR est **privé** par défaut : le VPS devra s'y authentifier (`docker login ghcr.io`) en phase 11, ou le paquet devra être rendu public.
+- La version de la CLI Supabase dans `deploy.yml` (3.0.0) est à aligner en T-2.1.
+- La CSP stricte (`style-src` avec nonce) est à revérifier avec Tailwind et shadcn (phase 4).
+- 1Password s'est verrouillé deux fois pendant les commits : la signature a échoué puis réussi après déverrouillage, sans jamais être contournée.
+
+**Validation de l'utilisateur** : ☑ validée le 2026-11-08

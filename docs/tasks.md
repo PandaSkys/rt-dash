@@ -67,9 +67,9 @@ Les ressources externes créées lors de la première tentative sont **conservé
 - [x] **T-1.7** `Dockerfile` en plusieurs étapes, utilisateur non root, `HEALTHCHECK`, aucune variable au build, npm, corepack et yarn retirés de l'image finale (L-06). *Fini quand* `docker build` puis `docker run` répondent sur `/api/health`.
 - [x] **T-1.8** `docker-compose.yml` (app + Caddy ; app en lecture seule, `cap_drop: [ALL]`, `no-new-privileges`), `Caddyfile` (HSTS), `.env.example` complet et commenté (variables du VPS seulement, design § 13.3). *Fini quand* `docker compose up` en local sert l'app derrière Caddy (`DOMAIN=localhost`) et qu'un test vérifie la configuration du conteneur.
 - [x] **T-1.9** `.github/workflows/ci.yml` (chaque push, toutes branches, L-08) : install (cache pnpm) → lint → typecheck → **contrôles de sécurité** (gitleaks, `pnpm audit --audit-level=high` avec exceptions datées, absence de `NEXT_PUBLIC_` et de `SERVICE_ROLE` dans `src/`) → tests unitaires → build → e2e → image + scan Trivy. Actions et images épinglées par empreinte (L-05). *Fini quand* la CI est verte et qu'un faux secret commité la fait échouer. *Réf.* design § 14, § 16.1 (couches 9, 10).
-- [ ] **T-1.10** `.github/workflows/deploy.yml` : build et push de l'image GHCR (`:sha`, `:latest`). Étapes migration, superadmin et SSH déjà écrites mais désactivées (`DEPLOY_ENABLED`) jusqu'à la phase 11. *Fini quand* l'image apparaît dans GHCR après une fusion sur `main`.
+- [x] **T-1.10** `.github/workflows/deploy.yml` : build et push de l'image GHCR (`:sha`, `:latest`). Étapes migration, superadmin et SSH déjà écrites mais désactivées (`DEPLOY_ENABLED`) jusqu'à la phase 11. *Fini quand* l'image apparaît dans GHCR après une fusion sur `main`.
 - [x] **T-1.11** `README.md` : lancer en local, variables, liens vers `docs/` et `CLAUDE.md`.
-- [ ] **T-1.12** Dependabot (`.github/dependabot.yml` : npm, Docker, GitHub Actions ; délai de 3 jours, L-05) et alertes de sécurité activées.
+- [x] **T-1.12** Dependabot (`.github/dependabot.yml` : npm, Docker, GitHub Actions ; délai de 3 jours, L-05) et alertes de sécurité activées.
 
 ## Phase 2 — Supabase (local et cloud), base et authentification Discord
 
