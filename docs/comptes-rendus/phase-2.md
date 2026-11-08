@@ -239,7 +239,15 @@
 - Supabase lancé avec la même liste d'exclusions, sans `supabase/.env` : `db:reset` ✅, `db:test` ✅ (20), `test:integration` ✅ (6), types régénérés **identiques** octet par octet.
 - `actionlint` sur `ci.yml` et `deploy.yml` : aucune erreur.
 
-**Reste à vérifier sur GitHub** : la CI ne tourne qu'après un push, donc après ton accord pour commiter. **T-2.5 sera cochée une fois les quatre jobs verts sur GitHub.**
+**Sur GitHub (2026-11-08)**
+- Commit `3725605` (T-2.1 à T-2.5) : jobs qualité, base de données et e2e **verts** ; job image **rouge**. Cause : `.dockerignore` exclut `tests/`, mais `playwright.config.ts` (qui importe maintenant `tests/support/`) entrait dans le contexte de build, et `next build` vérifie ses types.
+- Correctif : `playwright.config.ts` et le dossier `supabase/` exclus du contexte Docker. Le second évite aussi que `supabase/.env` (identifiants Discord locaux) n'entre dans le contexte de build sur le poste ; il n'atteignait pas l'image finale, mais il n'a rien à y faire. Vérifié en local : l'image se construit, ne contient aucun `.env`, `/api/health` répond 200 avec Supabase local et `/` renvoie vers `/login`.
+- Avant le push, gitleaks avait signalé un **faux positif** : un ID Discord de 18 chiffres dans un test, pris pour un identifiant d'application Discord. J'avais d'abord mis l'ID réel du superadmin (déjà dans les docs) ; il est remplacé par un ID inventé, marqué `gitleaks:allow` avec la raison. Le commit, pas encore poussé, a été corrigé (`--amend`), donc l'historique publié ne contient pas l'alerte.
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `.dockerignore` | modifié | `playwright.config.ts` et `supabase/` hors du contexte de build |
+| `tests/unit/core/auth/discord-identity.test.ts`, `tests/unit/app/page.test.tsx` | modifiés | ID Discord inventé à la place de l'ID réel ; faux positif gitleaks marqué |
 
 **Écarts avec les documents** : aucun.
 

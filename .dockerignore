@@ -14,3 +14,6 @@ docs
 Dockerfile
 docker-compose*.yml
 Caddyfile
+playwright.config.ts
+# Migrations, tests SQL et identifiants Discord locaux (supabase/.env) : inutiles au build.
+supabase
