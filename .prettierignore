@@ -1,0 +1,8 @@
+node_modules
+.next
+out
+coverage
+pnpm-lock.yaml
+docs
+src/core/supabase/database.types.ts
+CLAUDE.md

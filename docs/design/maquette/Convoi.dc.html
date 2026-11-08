@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>RT-Dash · Convoi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Noto+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#171717}
+a{color:inherit}
+.nav:hover{color:#FFFFFF}
+.btn:hover{filter:brightness(1.08)}
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #F8C032;outline-offset:2px}
+input.fld{height:44px;box-sizing:border-box;width:100%;border-radius:12px;border:1px solid #3A3A3A;background:#171717;color:#F4F4F4;padding:0 14px;font-size:14px;font-family:inherit}
+textarea.fld{box-sizing:border-box;width:100%;min-height:110px;border-radius:12px;border:1px solid #3A3A3A;background:#171717;color:#F4F4F4;padding:12px 14px;font-size:14px;font-family:inherit;line-height:1.45;resize:vertical}
+</style>
+</helmet>
+<div style="font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#171717;color:#F4F4F4;min-height:1700px;display:flex;flex-wrap:wrap;align-items:stretch">
+
+<aside style="flex:0 0 240px;width:240px;box-sizing:border-box;background:#1F1F1F;border-right:1px solid #2E2E2E;padding:24px 16px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;align-items:center;gap:10px;padding:0 8px">
+<img src="/_blob/f17552dd78e45830cbc095945e6de946" alt="" width="34" style="width:34px;height:auto;display:block">
+<div style="font-size:18px;font-weight:800;letter-spacing:-0.01em">RT-Dash</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="font-size:12px;color:#A3A3AB;padding:0 12px 6px;font-weight:600">Chargé d'événementiel</div>
+<a class="nav" href="Main.dc.html" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;text-decoration:none;font-size:14px;font-weight:600;color:#A8A8B0">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+<a class="nav" href="Tickets.dc.html" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;text-decoration:none;font-size:14px;font-weight:600;color:#A8A8B0">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>Tickets</a>
+<a class="nav" href="Convoi.dc.html" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;text-decoration:none;font-size:14px;font-weight:600;color:#F8C032;background:rgba(248,192,50,0.12)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>Convois</a>
+<a class="nav" href="#" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;text-decoration:none;font-size:14px;font-weight:600;color:#A8A8B0">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>Archive</a>
+<a class="nav" href="Ville.dc.html" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;text-decoration:none;font-size:14px;font-weight:600;color:#A8A8B0">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Villes et pays</a>
+</div>
+<div style="margin-top:auto;display:flex;flex-direction:column;gap:4px">
+<a class="nav" href="#" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;text-decoration:none;font-size:14px;font-weight:600;color:#A8A8B0">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>Paramètres</a>
+<a class="nav" href="Acces.dc.html" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;text-decoration:none;font-size:14px;font-weight:600;color:#A8A8B0">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>Déconnexion</a>
+</div>
+</aside>
+
+<main style="flex:999 1 560px;min-width:0;box-sizing:border-box;padding:24px;display:flex;flex-direction:column;gap:20px">
+
+<header style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px">
+<div>
+<a href="Tickets.dc.html" style="font-size:12px;color:#F8C032;font-weight:700;text-decoration:none">← Retour aux tickets</a>
+<div style="display:flex;align-items:center;gap:12px;margin-top:6px;flex-wrap:wrap">
+<div style="font-size:22px;font-weight:800">{{ displayName }}</div>
+<span style="font-size:12px;font-weight:700;color:#7ED6A0;background:rgba(126,214,160,0.16);border-radius:999px;padding:3px 10px">Ticket accepté · convoi créé</span>
+</div>
+<div style="font-size:12px;color:#A3A3AB;margin-top:4px">Accepté par Lina le 13 oct. à 09:12 · les infos viennent de TruckersMP et restent toutes modifiables.</div>
+</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<a class="btn" href="Tickets.dc.html" style="border:1px solid #3A3A3A;color:#F4F4F4;text-decoration:none;font-weight:600;font-size:13px;border-radius:999px;padding:10px 18px">Voir le ticket</a>
+<button class="btn" style="border:0;background:#F8C032;color:#1F1F1F;font-weight:800;font-size:13px;font-family:inherit;border-radius:999px;padding:10px 18px;cursor:pointer">Enregistrer</button>
+</div>
+</header>
+
+<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+
+<div style="flex:3 1 480px;min-width:0;display:flex;flex-direction:column;gap:20px">
+
+<section style="background:#1F1F1F;border:1px solid #2E2E2E;border-top:4px solid #F8C032;border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:16px">
+<div style="font-size:15px;font-weight:800">Informations générales</div>
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px">
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-nom" style="font-size:12px;color:#C4C4CA;font-weight:600">Nom du convoi (affiché dans le dashboard)</label><input id="f-nom" class="fld" type="text" value="{{ displayName }}" onInput="{{ onDisplayName }}"></div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-ent" style="font-size:12px;color:#C4C4CA;font-weight:600">Entreprise (dans le titre du message)</label><input id="f-ent" class="fld" type="text" value="{{ entreprise }}" onInput="{{ onEntreprise }}"></div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-date" style="font-size:12px;color:#C4C4CA;font-weight:600">Date (telle qu'écrite dans le message)</label><input id="f-date" class="fld" type="text" value="{{ date }}" onInput="{{ onDate }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="f-rdv" style="font-size:12px;color:#C4C4CA;font-weight:600">Heure de RDV</label><input id="f-rdv" class="fld" type="text" value="{{ rdv }}" onInput="{{ onRdv }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="f-dep" style="font-size:12px;color:#C4C4CA;font-weight:600">Heure de départ</label><input id="f-dep" class="fld" type="text" value="{{ depart }}" onInput="{{ onDepart }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="f-srv" style="font-size:12px;color:#C4C4CA;font-weight:600">Serveur</label><input id="f-srv" class="fld" type="text" value="{{ serveur }}" onInput="{{ onServeur }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="f-dlc" style="font-size:12px;color:#C4C4CA;font-weight:600">DLCs</label><input id="f-dlc" class="fld" type="text" value="{{ dlcs }}" onInput="{{ onDlcs }}"></div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-cibi" style="font-size:12px;color:#C4C4CA;font-weight:600">Cibi</label><input id="f-cibi" class="fld" type="text" value="{{ cibi }}" onInput="{{ onCibi }}"></div>
+</div>
+</section>
+
+<section style="background:#1F1F1F;border:1px solid #2E2E2E;border-top:4px solid #847EC2;border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:16px">
+<div style="font-size:15px;font-weight:800">Trajet</div>
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px">
+<div style="display:flex;flex-direction:column;gap:6px"><label for="f-vd" style="font-size:12px;color:#C4C4CA;font-weight:600">Ville de départ</label><input id="f-vd" class="fld" type="text" value="{{ vdVille }}" onInput="{{ onVdVille }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;color:#C4C4CA;font-weight:600">Pays de départ (auto)</div>
+<sc-if value="{{ depKnown }}" hint-placeholder-val="{{ true }}"><div style="height:44px;box-sizing:border-box;border-radius:12px;border:1px solid #3A3A3A;background:#171717;display:flex;align-items:center;padding:0 14px;font-size:14px;color:#F8C032">{{ depCountry }}</div></sc-if>
+<sc-if value="{{ depUnknown }}" hint-placeholder-val="{{ false }}"><a href="Ville.dc.html" style="height:44px;box-sizing:border-box;border-radius:12px;background:#847EC2;color:#1F1F1F;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:14px;font-weight:800;text-decoration:none"><span>Pays à compléter</span><span>Compléter</span></a></sc-if>
+</div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-ld" style="font-size:12px;color:#C4C4CA;font-weight:600">Lieu de départ (entreprise)</label><input id="f-ld" class="fld" type="text" value="{{ vdLieu }}" onInput="{{ onVdLieu }}"></div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-pause" style="font-size:12px;color:#C4C4CA;font-weight:600">Pause</label><input id="f-pause" class="fld" type="text" value="{{ pause }}" onInput="{{ onPause }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="f-va" style="font-size:12px;color:#C4C4CA;font-weight:600">Ville d'arrivée</label><input id="f-va" class="fld" type="text" value="{{ vaVille }}" onInput="{{ onVaVille }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;color:#C4C4CA;font-weight:600">Pays d'arrivée (auto)</div>
+<sc-if value="{{ arrKnown }}" hint-placeholder-val="{{ true }}"><div style="height:44px;box-sizing:border-box;border-radius:12px;border:1px solid #3A3A3A;background:#171717;display:flex;align-items:center;padding:0 14px;font-size:14px;color:#F8C032">{{ arrCountry }}</div></sc-if>
+<sc-if value="{{ arrUnknown }}" hint-placeholder-val="{{ false }}"><a href="Ville.dc.html" style="height:44px;box-sizing:border-box;border-radius:12px;background:#847EC2;color:#1F1F1F;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:14px;font-weight:800;text-decoration:none"><span>Pays à compléter</span><span>Compléter</span></a></sc-if>
+</div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-la" style="font-size:12px;color:#C4C4CA;font-weight:600">Lieu d'arrivée (entreprise)</label><input id="f-la" class="fld" type="text" value="{{ vaLieu }}" onInput="{{ onVaLieu }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="f-gps" style="font-size:12px;color:#C4C4CA;font-weight:600">GPS</label><input id="f-gps" class="fld" type="text" value="{{ gps }}" onInput="{{ onGps }}"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="f-dist" style="font-size:12px;color:#C4C4CA;font-weight:600">Distance</label><input id="f-dist" class="fld" type="text" value="{{ distance }}" onInput="{{ onDistance }}"></div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-carg" style="font-size:12px;color:#C4C4CA;font-weight:600">Cargaison</label><input id="f-carg" class="fld" type="text" value="{{ cargaison }}" onInput="{{ onCargaison }}"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="font-size:12px;color:#C4C4CA;font-weight:600">Image du trajet</div>
+<div style="height:150px;border-radius:14px;border:1px dashed #4A4A4A;background:repeating-linear-gradient(135deg,#1B1B1B 0 14px,#212121 14px 28px);display:flex;align-items:center;justify-content:center;font-size:12px;color:#A3A3AB">Image du trajet</div>
+</div>
+</section>
+
+<section style="background:#1F1F1F;border:1px solid #2E2E2E;border-top:4px solid #E4E1F7;border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:16px">
+<div style="font-size:15px;font-weight:800">Liens et consignes</div>
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px">
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-tmp" style="font-size:12px;color:#C4C4CA;font-weight:600">Lien TruckersMP (TMP)</label><input id="f-tmp" class="fld" type="text" value="{{ tmp }}" onInput="{{ onTmp }}"></div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-tb" style="font-size:12px;color:#C4C4CA;font-weight:600">Lien TrucksBook (TB)</label><input id="f-tb" class="fld" type="text" value="{{ tb }}" onInput="{{ onTb }}"></div>
+<div style="grid-column:span 2;display:flex;flex-direction:column;gap:6px"><label for="f-cons" style="font-size:12px;color:#C4C4CA;font-weight:600">Consignes (citation en haut du message)</label><textarea id="f-cons" class="fld" value="{{ consignes }}" onInput="{{ onConsignes }}"></textarea></div>
+</div>
+</section>
+
+<section style="background:#1F1F1F;border:1px solid #2E2E2E;border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:14px">
+<div style="font-size:15px;font-weight:800">Historique</div>
+<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;flex:0 0 32px;border-radius:999px;background:#F8C032;color:#1F1F1F;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">L</div><div style="font-size:13px;line-height:1.45"><div><strong>Lina</strong> a modifié l'heure de départ : 21:00 → 21:30</div><div style="color:#A3A3AB;font-size:12px">13 oct. 2026 · 09:18</div></div></div>
+<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;flex:0 0 32px;border-radius:999px;background:#F8C032;color:#1F1F1F;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">L</div><div style="font-size:13px;line-height:1.45"><div><strong>Lina</strong> a accepté le ticket · convoi créé</div><div style="color:#A3A3AB;font-size:12px">13 oct. 2026 · 09:12</div></div></div>
+<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;flex:0 0 32px;border-radius:999px;background:#E4E1F7;color:#1F1F1F;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">M</div><div style="font-size:13px;line-height:1.45"><div><strong>Max</strong> a pris en charge le ticket</div><div style="color:#A3A3AB;font-size:12px">13 oct. 2026 · 08:40</div></div></div>
+<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;flex:0 0 32px;border-radius:999px;background:#847EC2;color:#1F1F1F;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">N</div><div style="font-size:13px;line-height:1.45"><div><strong>Nathan</strong> a ajouté le ticket avec le lien TruckersMP</div><div style="color:#A3A3AB;font-size:12px">13 oct. 2026 · 08:31</div></div></div>
+</section>
+
+</div>
+
+<aside style="flex:2 1 420px;min-width:0;max-width:640px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+<div style="font-size:15px;font-weight:800">Aperçu Discord</div>
+<span style="font-size:12px;font-weight:800;color:#1F1F1F;background:#F8C032;border-radius:999px;padding:3px 10px">En direct</span>
+</div>
+
+<div style="background:#313338;border-radius:14px;padding:16px 18px 18px;font-family:'gg sans','Noto Sans','Helvetica Neue',Helvetica,Arial,sans-serif;color:#DBDEE1;font-size:16px;line-height:22px">
+<div style="display:flex;gap:14px;align-items:flex-start">
+<div style="width:40px;height:40px;flex:0 0 40px;border-radius:999px;background:#0F0F10;color:#FFFFFF;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;letter-spacing:-0.02em">RAVENBot</div>
+<div style="min-width:0;flex:1">
+
+<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:16px;font-weight:500;color:#F2F3F5">RavenBot</span><span style="background:#5865F2;color:#FFFFFF;font-size:10px;font-weight:600;line-height:15px;padding:0 4px;border-radius:4px;text-transform:uppercase">App</span><span style="font-size:12px;color:#949BA4;margin-left:2px">13/10/2026 10:24</span></div>
+
+<div style="margin-top:8px;font-size:24px;line-height:33px;font-weight:700;color:#F2F3F5;word-break:break-word">{{ titleTxt }}</div>
+
+<div style="margin-top:6px;display:flex"><div style="width:4px;flex:0 0 4px;border-radius:4px;background:#4E5058"></div><div style="padding:0 8px 0 12px;font-weight:700;white-space:pre-line;word-break:break-word">{{ consignes }}</div></div>
+
+<div style="margin-top:44px;font-size:20px;line-height:27px;font-weight:700;color:#F2F3F5">INFORMATIONS GÉNÉRALES</div>
+<div style="margin-top:8px">
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">🗓️</span><strong style="font-weight:700;color:#F2F3F5">Date :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ date }}</code></div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">🕙</span><strong style="font-weight:700;color:#F2F3F5">Horaires :</strong></div>
+<div style="padding-left:30px">RDV : <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px">{{ rdvTxt }}</code> | Départ : <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px">{{ departTxt }}</code></div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">💻</span><strong style="font-weight:700;color:#F2F3F5">Serveur :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ serveur }}</code></div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">🗺️</span><strong style="font-weight:700;color:#F2F3F5">DLCs :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ dlcs }}</code></div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">🔊</span><strong style="font-weight:700;color:#F2F3F5">Cibi :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ cibi }}</code></div>
+</div>
+
+<div style="margin-top:44px;font-size:20px;line-height:27px;font-weight:700;color:#F2F3F5">TRAJET</div>
+<div style="margin-top:8px">
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">🟩</span><strong style="font-weight:700;color:#F2F3F5">Départ :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ depTxt }}</code></div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">🟧</span><strong style="font-weight:700;color:#F2F3F5">Pause :</strong> {{ pause }}</div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">🟥</span><strong style="font-weight:700;color:#F2F3F5">Arrivée :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ arrTxt }}</code></div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">📌</span><strong style="font-weight:700;color:#F2F3F5">GPS :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ gps }}</code></div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">📏</span><strong style="font-weight:700;color:#F2F3F5">Distance :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ distance }}</code></div>
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">📦</span><strong style="font-weight:700;color:#F2F3F5">Cargaison :</strong> <code style="font-family:Consolas,'Andale Mono WT','Andale Mono','Lucida Console','Lucida Sans Typewriter','DejaVu Sans Mono','Bitstream Vera Sans Mono','Liberation Mono','Nimbus Mono L',Monaco,'Courier New',Courier,monospace;font-size:14px;background:#2B2D31;border:1px solid #1E1F22;border-radius:4px;padding:0 4px;white-space:pre-wrap">{{ cargaison }}</code></div>
+</div>
+
+<div style="margin-top:44px">
+<div><span style="font-size:20px;line-height:1;vertical-align:-2px;margin-right:4px">🔗</span><strong style="font-weight:700;color:#F2F3F5">LIENS :</strong> <em>(Inscription requise)</em></div>
+<div style="padding-left:30px;word-break:break-all">TMP : <a href="{{ tmp }}" style="color:#00A8FC;text-decoration:none">{{ tmp }}</a></div>
+<div style="padding-left:30px;word-break:break-all">TB : {{ tb }}</div>
+</div>
+
+<div style="margin-top:22px;font-weight:700;color:#F2F3F5;text-transform:uppercase">Merci de prévenir de votre présence:</div>
+<div style="font-weight:700;color:#F2F3F5">PRÉSENT <span style="font-size:20px;line-height:1;vertical-align:-2px">✅</span> | NON <span style="font-size:20px;line-height:1;vertical-align:-2px">❌</span> | INCERTAIN <span style="font-size:20px;line-height:1;vertical-align:-2px">⚠️</span></div>
+
+<div style="margin-top:8px;max-width:520px;background:#2B2D31;border:1px solid #1E1F22;border-radius:8px;padding:16px">
+<div style="height:230px;border-radius:4px;background:repeating-linear-gradient(135deg,#232428 0 14px,#26282D 14px 28px);display:flex;align-items:center;justify-content:center;font-size:12px;color:#949BA4">Image du trajet</div>
+</div>
+
+<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+<div style="height:32px;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:0 8px;border-radius:8px;background:#2B2D31;border:1px solid #3F4147;font-size:14px;font-weight:600;color:#B5BAC1"><span style="font-size:18px;line-height:1">❌</span>1</div>
+<div style="height:32px;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:0 8px;border-radius:8px;background:#2B2D31;border:1px solid #3F4147;font-size:14px;font-weight:600;color:#B5BAC1"><span style="font-size:18px;line-height:1">✅</span>1</div>
+<div style="width:34px;height:32px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#2B2D31;border:1px solid #3F4147;color:#B5BAC1"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9.01h.01"/><path d="M15 9.01h.01"/></svg></div>
+</div>
+
+</div>
+</div>
+</div>
+<div style="font-size:12px;color:#A3A3AB;line-height:1.5">Reproduit le message RavenBot (thème sombre par défaut de Discord) et se met à jour pendant que tu tapes. Les emojis sont ceux de ton système, les réactions sont données en exemple.</div>
+</aside>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const D = {
+displayName: 'Reims – Prague',
+entreprise: 'Limpens Trasporti Italy',
+date: 'samedi 7 novembre',
+rdv: '21:00',
+depart: '21:30',
+serveur: 'Non défini',
+dlcs: 'Aucun',
+cibi: 'CIBI CONVOI DISCORD',
+vdVille: 'Reims',
+vdLieu: 'Steinbruch',
+pause: 'Aucune',
+vaVille: 'Prague',
+vaLieu: 'Steinbruch',
+gps: 'Le plus rapide',
+distance: '~1173 KM + 2 POINTS',
+cargaison: '-10 Tonnes',
+tmp: 'https://truckersmp.com/events/36491',
+tb: '',
+consignes: 'Utiliser le Profil Convoi et le "RENAULT T EVOLUTION" comme véhicule (Profil obligatoire depuis le 1 Mars 2026)\nTAG MP ➞ RAVEN TRANSPORT (Couleur R:255 G:195 B:0)'
+};
+const v = (k) => (s[k] !== undefined ? s[k] : D[k]);
+const set = (k) => (e) => this.setState({ [k]: e.target.value });
+const fmt = (t) => String(t || '').replace(':', 'H').toUpperCase();
+const countries = {
+reims: 'France', paris: 'France', lyon: 'France', calais: 'France',
+prague: 'République tchèque', duisburg: 'Allemagne', berlin: 'Allemagne',
+tallinn: 'Estonie', riga: 'Lettonie', kaunas: 'Lituanie',
+rotterdam: 'Pays-Bas', milano: 'Italie', katowice: 'Pologne'
+};
+const ctry = (c) => countries[String(c || '').trim().toLowerCase()] || '';
+const dc = ctry(v('vdVille'));
+const ac = ctry(v('vaVille'));
+const place = (city, country, lieu) => city + ' (' + (country || 'pays à compléter') + ')' + (lieu ? ' | ' + lieu : '');
+return {
+displayName: v('displayName'),
+entreprise: v('entreprise'),
+date: v('date'),
+rdv: v('rdv'),
+depart: v('depart'),
+serveur: v('serveur'),
+dlcs: v('dlcs'),
+cibi: v('cibi'),
+vdVille: v('vdVille'),
+vdLieu: v('vdLieu'),
+pause: v('pause'),
+vaVille: v('vaVille'),
+vaLieu: v('vaLieu'),
+gps: v('gps'),
+distance: v('distance'),
+cargaison: v('cargaison'),
+tmp: v('tmp'),
+tb: v('tb'),
+consignes: v('consignes'),
+titleTxt: 'INVITATION CONVOI - ' + v('date') + ' - ' + v('entreprise'),
+rdvTxt: fmt(v('rdv')),
+departTxt: fmt(v('depart')),
+depTxt: place(v('vdVille'), dc, v('vdLieu')),
+arrTxt: place(v('vaVille'), ac, v('vaLieu')),
+depKnown: !!dc,
+depUnknown: !dc,
+depCountry: dc,
+arrKnown: !!ac,
+arrUnknown: !ac,
+arrCountry: ac,
+onDisplayName: set('displayName'),
+onEntreprise: set('entreprise'),
+onDate: set('date'),
+onRdv: set('rdv'),
+onDepart: set('depart'),
+onServeur: set('serveur'),
+onDlcs: set('dlcs'),
+onCibi: set('cibi'),
+onVdVille: set('vdVille'),
+onVdLieu: set('vdLieu'),
+onPause: set('pause'),
+onVaVille: set('vaVille'),
+onVaLieu: set('vaLieu'),
+onGps: set('gps'),
+onDistance: set('distance'),
+onCargaison: set('cargaison'),
+onTmp: set('tmp'),
+onTb: set('tb'),
+onConsignes: set('consignes')
+};
+}
+}
+</script>
+</body>
+</html>

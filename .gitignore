@@ -1,0 +1,22 @@
+# Dépendances
+/node_modules
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+
+# Tests
+/coverage
+/test-results/
+/playwright-report/
+
+# Secrets : jamais commités, sauf le modèle .env.example
+.env*
+!.env.example
+
+# Divers
+*.tsbuildinfo
+*.pem
+.DS_Store
+npm-debug.log*

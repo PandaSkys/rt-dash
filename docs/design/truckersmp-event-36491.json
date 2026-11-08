@@ -1,0 +1,55 @@
+{
+  "error": false,
+  "response": {
+    "id": 36491,
+    "event_type": {
+      "key": "convoy",
+      "name": "Convoy"
+    },
+    "name": "Limpens Franco-Bohemian Convoy",
+    "slug": "36491-limpens-franco-bohemian-convoy",
+    "game": "ETS2",
+    "server": {
+      "id": 14,
+      "name": "Event Server"
+    },
+    "language": "English",
+    "departure": {
+      "location": "Steinbruch",
+      "city": "Reims"
+    },
+    "arrive": {
+      "location": "Steinbruch",
+      "city": "Prague"
+    },
+    "meetup_at": "2026-11-07 19:30:00",
+    "start_at": "2026-11-07 20:30:00",
+    "banner": "https://static.truckersmp.com/images/event/cover/36491.1782666273.png",
+    "map": "https://static.truckersmp.com/images/event/map/36491.1782663524.png",
+    "description": "# :earth_asia:**Limpens Franco-Bohemian Convoy**:earth_asia:\r\n![](https://i.imgur.com/qctoxoA.png)\r\n### 📣   **server: To be determined**\r\n\r\n### 🗓   **Sabato 07 Novembre ‖ Saturday 07 November**\r\n\r\n### 🕘   **orario incontro (Meetup) 20:30 CET | 19:30 UTC**\r\n\r\n### 🕤   **orario partenza (Departure) 21:30 CET | 20:30 UTC**\r\n\r\n### 🚦   **Reims ⇒ Steinbruch** \r\n\r\n### 🏁   **Prague ⇒ Steinbruch**\r\n\r\n### 📷   **Foto in the company Steinbruch**\r\n \r\n### 🛣   **Tot 1170 Km** \r\n\r\n![](https://i.imgur.com/qctoxoA.png)\r\n\r\n![](https://i.imgur.com/10xOyJZ.png)\r\n![](https://i.imgur.com/qctoxoA.png)\r\n![](https://i.imgur.com/KeZ1L5d.png)\r\n![](https://i.imgur.com/qctoxoA.png)\r\n![](https://i.imgur.com/qctoxoA.png)\r\n![](https://i.imgur.com/N4DGUn3.png)\r\n![](https://i.imgur.com/QdO3E4i.png)\r\n![](https://i.imgur.com/qctoxoA.png)\r\n###  :flag_it:  **Per chi non raggiunge almeno 4 partecipanti, sarà disponibile lo slot pubblico.**\r\n###  :flag_gb:  **Companies with fewer than 4 participants will be assigned to a public slot.**\r\n ![](https://i.imgur.com/qctoxoA.png)\r\n![](https://i.imgur.com/B8d9TiF.png)\r\n### Event Supervised by [Drive Along](https://discord.gg/Q7vhhwpPQZ)\r\n![](https://imgur.com/RRARBU4.png)\r\n![](https://i.imgur.com/qctoxoA.png)\r\n### This Event is captured by [Drive Along](https://discord.gg/Q7vhhwpPQZ)![](https://i.postimg.cc/c44SKvG9/New-Media-Banner.png)",
+    "rule": "- **Event Rules for Participants:**\r\n\r\n- The Event Staff are recognized as; “Drive Along | EF, Drive Along | ES, Drive Along | CC, Drive Along | Lead, Drive Along | Tail, Drive Along | GM\" or similar.\r\n- Free roaming is prohibited.\r\n- Participants must haul a trailer.\r\n- Double trailers, Triple trailers, HCT trailers and Heavy Haul configurations are prohibited. (Except Event Staff)\r\n- Participants should park at their designated slots. If you don't have a designated slot you are required - to park in the 'Public Parking' area.\r\n- Overtaking is prohibited.\r\n- Cars are prohibited except for event staff showing a clear tag.\r\n- All other TruckersMP rules apply.\r\n\r\n- **Event Rules for Event Staff:**\r\n\r\n- Event Staff can block junctions and roads approaching junctions in order to direct the convoy.\r\n- Event Staff can park out of bounds. Providing this is on the ground and not on top of buildings or other - inappropriate places deemed unsuitable by TruckersMP Staff.\r\n- Event Staff overtaking the convoy cannot be performed by more than 2 members at a time.\r\n- Event Staff can drive the incorrect way where roads have a central reservation barrier ONLY. In accordance with the rule above.\r\n- All other TruckersMP rules apply.",
+    "voice_link": "https://discord.gg/Q4qDczNheg",
+    "external_link": "https://sites.google.com/view/limpens-trasporti-italy-vtc/home",
+    "featured": "",
+    "vtc": {
+      "id": 0,
+      "name": null
+    },
+    "user": {
+      "id": 5061494,
+      "username": "maury79"
+    },
+    "attendances": {
+      "confirmed": 103,
+      "unsure": 2,
+      "vtcs": 22,
+      "confirmed_users": [],
+      "unsure_users": [],
+      "confirmed_vtcs": []
+    },
+    "dlcs": [],
+    "url": "/events/36491-limpens-franco-bohemian-convoy",
+    "created_at": "2026-06-28 16:18:43",
+    "updated_at": "2026-09-13 20:32:21"
+  }
+}
