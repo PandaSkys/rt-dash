@@ -1,0 +1,79 @@
+# Intégration continue : vérifie chaque push, sur toutes les branches (design § 14, L-08).
+# Une pull request affiche les résultats du push de sa branche, sans double exécution.
+# Actions et images épinglées par empreinte (L-05) ; Dependabot les met à jour (T-1.12).
+name: CI
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Qualité, sécurité et tests unitaires
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tout l'historique, pour que gitleaks le parcoure
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm format:check
+      - name: Aucun secret commité (gitleaks, tout l'historique)
+        run: >
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --redact --verbose
+      - name: Aucune vulnérabilité élevée dans les dépendances
+        run: pnpm audit --audit-level=high
+      - name: Ni NEXT_PUBLIC_ ni SERVICE_ROLE dans src/ (design § 16.1, couche 9)
+        run: |
+          if grep -rn -E "NEXT_PUBLIC_|SERVICE_ROLE" src/; then
+            echo "::error::Variable interdite trouvée dans src/"
+            exit 1
+          fi
+      - run: pnpm test
+
+  e2e:
+    name: Build et tests de bout en bout
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Build de production puis tests e2e
+        run: pnpm test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  image:
+    name: Image Docker et scan Trivy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build --tag rt-dash:ci .
+      - name: Aucune vulnérabilité élevée ou critique corrigeable dans l'image
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+          image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed rt-dash:ci

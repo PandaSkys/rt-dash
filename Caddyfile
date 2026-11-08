@@ -1,0 +1,9 @@
+# Caddy obtient et renouvelle le certificat HTTPS de {$DOMAIN} automatiquement.
+{$DOMAIN} {
+	header {
+		# Le navigateur n'utilisera plus que HTTPS pour ce domaine pendant un an.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	reverse_proxy app:3000
+}

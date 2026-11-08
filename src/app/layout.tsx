@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+// Dynamique : le nonce de la CSP change à chaque requête.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "RT-Dash",
   description: "Dashboard d'administration RT-Dash",

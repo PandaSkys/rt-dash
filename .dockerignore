@@ -1,0 +1,16 @@
+# Seul le code nécessaire au build entre dans l'image ; jamais de secret.
+.env*
+!.env.example
+.git
+.github
+.next
+node_modules
+coverage
+test-results
+playwright-report
+tests
+docs
+*.md
+Dockerfile
+docker-compose*.yml
+Caddyfile

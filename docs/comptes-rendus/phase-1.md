@@ -52,7 +52,7 @@
 **Ce qui a été fait**
 - Dépôt neuf `PandaSkys/rt-dash` (créé par l'utilisateur) utilisé ; `git init -b main`, remote SSH.
 - `.gitignore` (`.env*` sauf `.env.example`) et `.gitattributes` (fins de ligne LF, PNG binaires).
-- Premier commit signé et push sur `main`.
+- Premier commit signé (signature SSH, 1Password) `d93a132` et push sur `main`. Une 1re tentative avait échoué car 1Password était verrouillé ; signature jamais contournée.
 
 **Fichiers créés ou modifiés**
 
@@ -67,3 +67,220 @@
 
 **Relecture**
 - [x] Rien d'autre que la tâche n'a été modifié.
+
+---
+
+## T-1.3 — Vitest et Testing Library · 2026-11-08
+
+**Ce qui a été fait**
+- Vitest 5 avec deux projets : `unit` (jsdom, `tests/unit/`) et `integration` (node, `tests/integration/`, vide pour l'instant).
+- Scripts `test`, `test:unit`, `test:integration`. Alias `@/` reconnu dans les tests.
+- Un test d'exemple : la page d'accueil affiche le titre « RT-Dash ».
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `vitest.config.mts` | créé | deux projets, alias `@/` (`.mts` pour éviter l'avertissement de chargement ESM) |
+| `vitest.setup.ts` | créé | matchers `jest-dom` pour Testing Library |
+| `tests/unit/app/page.test.tsx` | créé | test d'exemple (miroir de `src/`) |
+| `tests/integration/` | créé (vide) | emplacement des tests d'intégration (phase 2) |
+| `package.json`, `pnpm-lock.yaml` | modifiés | dépendances et scripts de test |
+| `docs/tasks.md` | modifié | T-1.3 cochée |
+
+**Comment vérifier** : `pnpm test` (1 test passe) ; `pnpm test:integration` ne signale rien à exécuter et réussit.
+
+**Tests** : `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅ · `pnpm test` ✅
+
+**Écarts avec les documents**
+- Le test d'exemple a été écrit après la page (elle existait déjà depuis T-1.1) : pas de cycle « échec puis succès » ici, la logique n'est pas métier.
+
+**Hors périmètre, non fait** : aucun. **Points ouverts** : aucun.
+
+**Relecture**
+- [x] Code relu comme un nouveau venu le lirait (design § 3.2).
+
+---
+
+## T-1.4 et T-1.5 — Playwright et `/api/health` · 2026-11-08
+
+Les deux tâches sont liées (le test de fumée de T-1.4 vise la route de T-1.5) ; menées ensemble, test d'abord.
+
+**Ce qui a été fait**
+- Test e2e écrit d'abord : il échoue tant que la route n'existe pas (le serveur de test n'est jamais « prêt »).
+- Route `GET /api/health` : 200 + `{"status":"ok"}`, avec un test unitaire (écrit avant, échec constaté).
+- Playwright : l'e2e construit puis lance le **build de production** sur le port 3100, comme en CI et sur le VPS ; script `test:e2e`. Le navigateur Chromium a été téléchargé par `playwright install` (outil de test, hors dépôt).
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `playwright.config.ts` | créé | config e2e (build de production, port 3100) |
+| `tests/e2e/health.spec.ts` | créé | test de fumée (T-1.4) |
+| `src/app/api/health/route.ts` | créé | endpoint de santé (T-1.5) |
+| `tests/unit/app/api/health/route.test.ts` | créé | test unitaire de la route |
+| `package.json`, `pnpm-lock.yaml` | modifiés | Playwright et script `test:e2e` |
+| `docs/tasks.md` | modifié | T-1.4 et T-1.5 cochées |
+
+**Comment vérifier** : `pnpm test:e2e` (1 test passe) ; `pnpm test` (2 tests passent).
+
+**Tests** : `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅ · `pnpm test` ✅ · `pnpm test:e2e` ✅
+
+**Écarts avec les documents** : aucun. **Hors périmètre, non fait** : aucun.
+**Points ouverts** : `pnpm test` ne lance pas l'e2e (il est plus lent) ; la CI les enchaînera en T-1.9.
+
+**Relecture**
+- [x] Code relu comme un nouveau venu le lirait (design § 3.2).
+
+---
+
+## T-1.6 — `next.config`, en-têtes de sécurité, CSP avec nonce · 2026-11-08
+
+**Ce qui a été fait**
+- `output: "standalone"` ; pas de `serverActions.allowedOrigins` (L-04, commenté dans le fichier).
+- En-têtes fixes (`next.config.ts`) : `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (caméra, micro, géolocalisation, paiement, USB fermés).
+- CSP avec **nonce** différent à chaque requête, posée par `src/proxy.ts` (`frame-ancestors 'none'`, `object-src 'none'`, scripts uniquement avec nonce + `strict-dynamic`, `unsafe-eval` seulement en développement). Le constructeur de la CSP est une fonction pure testée.
+- Le layout racine est forcé en rendu dynamique, sinon la page serait figée au build, sans nonce.
+- Tests d'abord : unitaires (CSP, nonce) en échec puis au vert ; e2e sur le build de production : chaque en-tête, nonce différent par requête, nonce présent sur les scripts de la page, aucune violation de CSP dans le navigateur.
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `next.config.ts` | modifié | standalone + en-têtes fixes |
+| `src/core/security/content-security-policy.ts` | créé | génération du nonce et de la CSP (logique pure) |
+| `src/proxy.ts` | créé | pose la CSP à chaque requête (sera complété en T-2.4 pour la session) |
+| `src/app/layout.tsx` | modifié | rendu dynamique pour le nonce |
+| `tests/unit/core/security/content-security-policy.test.ts` | créé | tests de la CSP |
+| `tests/e2e/security-headers.spec.ts` | créé | tests e2e des en-têtes |
+| `docs/tasks.md` | modifié | T-1.6 cochée |
+
+**Comment vérifier** : `pnpm test` (8 tests) puis `pnpm test:e2e` (6 tests).
+
+**Tests** : `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅ · `pnpm test` ✅ · `pnpm test:e2e` ✅
+
+**Écarts avec les documents**
+- `upgrade-insecure-requests` (présent dans l'exemple de la doc Next) n'est pas ajouté : le HTTPS est imposé par Caddy et HSTS (T-1.8).
+
+**Hors périmètre, non fait** : aucun.
+
+**Points ouverts / questions**
+- Next affiche l'avertissement « `next start` ne fonctionne pas avec `output: standalone` » pendant l'e2e. Les tests passent ; l'image Docker (T-1.7) lancera `node server.js`. À toi de dire si tu veux que l'e2e lance aussi le serveur standalone.
+- Rappel : la CSP est stricte (`style-src` avec nonce) ; il faudra la revérifier avec Tailwind et les composants shadcn (phase 4).
+
+**Relecture**
+- [x] Code relu comme un nouveau venu le lirait (design § 3.2).
+
+**Complément du 2026-11-08 (validé par l'utilisateur)** : l'e2e lance désormais le **serveur standalone** (`node .next/standalone/server.js`), le même que l'image Docker ; l'avertissement de `next start` a disparu. Fichiers : `playwright.config.ts` (modifié), `scripts/prepare-standalone.mjs` (créé : copie `.next/static` et `public/` à côté de `server.js`, comme le Dockerfile). E2E : 6 tests ✅.
+
+---
+
+## T-1.7 — Dockerfile · 2026-11-08
+
+**Ce qui a été fait** — l'image est construite en trois étapes :
+1. `deps` : installe pnpm 11.20.0 puis les dépendances avec le fichier de verrouillage figé ;
+2. `build` : `next build` en standalone, **sans aucune variable d'application** (la même image sert partout) ;
+3. `runner` : uniquement le serveur standalone, les fichiers statiques et `public/`, avec l'utilisateur non root `node`, un `HEALTHCHECK` sur `/api/health`, et **npm, npx, corepack et yarn supprimés** (L-06).
+- Image de base `node:24-alpine` **épinglée par empreinte** (L-05).
+- `.dockerignore` : aucun `.env*`, ni `.git`, ni tests ou docs dans le contexte de build.
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `Dockerfile` | créé | image de production |
+| `.dockerignore` | créé | contexte de build minimal, sans secret |
+| `public/.gitkeep` | créé | le dossier `public/` doit exister pour le Dockerfile ; les logos y arriveront en T-4.3 |
+| `docs/tasks.md` | modifié | T-1.7 cochée |
+
+**Comment vérifier**
+1. `docker build -t rt-dash:local .`
+2. `docker run -d --name rt-dash-test -p 3200:3000 rt-dash:local`, puis `curl -i localhost:3200/api/health` → 200, `{"status":"ok"}` et les en-têtes de sécurité.
+3. `docker inspect rt-dash-test --format '{{.State.Health.Status}}'` → `healthy`. `docker exec rt-dash-test which npm` → rien.
+
+**Tests** : vérifications ci-dessus faites à la main (✅). Le scan Trivy de l'image et le test de configuration du conteneur arrivent en T-1.8 et T-1.9. `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` ✅
+
+**Écarts avec les documents** : aucun.
+
+**Points ouverts**
+- L'image fait 298 Mo. Ce n'est pas un problème pour l'instant ; on pourra l'alléger plus tard si besoin (non fait, hors périmètre).
+- Vérifié au passage : l'ICU française est présente dans l'image de base (`Intl` en `fr-FR` donne « dimanche »), utile pour T-4.10.
+
+**Relecture**
+- [x] Fichiers relus ; commentaires limités au « pourquoi ».
+
+---
+
+## T-1.8 — docker-compose, Caddy, `.env.example` · 2026-11-08
+
+**Ce qui a été fait**
+- `docker-compose.yml` (production) : service `app` (image GHCR, lecture seule, tmpfs pour `/tmp` et le cache Next, `cap_drop: [ALL]`, `no-new-privileges`, contrôle de santé, **aucun port publié**) et service `caddy` (seul à publier 80/443, image épinglée par empreinte, démarre quand l'app est en bonne santé).
+- `Caddyfile` : HTTPS automatique pour `{$DOMAIN}`, **HSTS** (1 an, sous-domaines), en-tête `Server` retiré, redirection HTTP → HTTPS (308) faite par Caddy.
+- `.env.example` : uniquement les variables du VPS (design § 13.3), commentées, sans aucune vraie valeur.
+- Test d'abord : `tests/unit/infra/docker-compose.test.ts` lit la configuration et vérifie chaque mesure de durcissement et HSTS (en échec avant d'écrire les fichiers).
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `docker-compose.yml` | créé | déploiement app + Caddy |
+| `Caddyfile` | créé | HTTPS, HSTS, proxy vers l'app |
+| `.env.example` | créé | modèle commenté des variables du VPS |
+| `tests/unit/infra/docker-compose.test.ts` | créé | test de la configuration du conteneur |
+| `package.json`, `pnpm-lock.yaml` | modifiés | `yaml` (lecture du fichier compose dans le test) |
+| `docs/tasks.md` | modifié | T-1.8 cochée |
+
+**Comment vérifier** (en local, `DOMAIN=localhost`)
+1. `docker build -t ghcr.io/pandaskys/rt-dash:local .`
+2. Créer un `.env` à partir de `.env.example` avec `DOMAIN=localhost`, `TAG=local`.
+3. `docker compose up -d`, puis `curl -k https://localhost/api/health` → 200, `{"status":"ok"}`, HSTS, CSP. `http://localhost` redirige en 308 vers HTTPS.
+4. `docker compose down -v` et supprimer le `.env` de test.
+
+Fait le 2026-11-08 : tout est conforme ; la page `/` s'affiche malgré le système de fichiers en lecture seule. Le `.env` de test a été supprimé ensuite.
+
+**Tests** : `pnpm test` (16 tests) ✅ · `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅
+
+**Écarts avec les documents**
+- Image `caddy:2-alpine` épinglée par empreinte, au lieu de `caddy:2` (L-05 ; plus légère).
+- `depends_on` attend que l'app soit en bonne santé (`service_healthy`).
+- `GITHUB_OWNER` vaut `pandaskys` en minuscules : GHCR n'accepte que des minuscules dans le nom de l'image.
+
+**Hors périmètre, non fait** : durcir aussi le conteneur Caddy (non demandé).
+**Points ouverts** : aucun.
+
+**Relecture**
+- [x] Fichiers relus ; commentaires limités au « pourquoi ».
+
+---
+
+## T-1.9 — CI GitHub Actions (`ci.yml`) · 2026-11-08
+
+**En clair, pour débuter** : à chaque `git push`, GitHub loue trois machines Linux et y lance nos vérifications, en parallèle. Si l'une échoue, une croix rouge apparaît à côté du commit (onglet *Actions* du dépôt) ; plus tard, la protection de `main` empêchera de fusionner tant que les trois ne sont pas vertes.
+
+| Vérification (job) | Ce qu'elle fait |
+|---|---|
+| **Qualité, sécurité et tests unitaires** | installe les dépendances (avec cache) → lint → types → formatage → **gitleaks** (cherche un secret dans tout l'historique git) → **`pnpm audit`** (bloque si une dépendance a une faille élevée) → refuse `NEXT_PUBLIC_` et `SERVICE_ROLE` dans `src/` → tests unitaires |
+| **Build et tests de bout en bout** | build de production + serveur standalone + tests Playwright (santé, en-têtes, CSP) ; en cas d'échec, le rapport Playwright est téléchargeable 7 jours |
+| **Image Docker et scan Trivy** | construit l'image et la fait analyser par **Trivy**, qui bloque sur toute faille élevée ou critique corrigeable |
+
+**Sécurité de la CI elle-même**
+- Chaque action GitHub est épinglée par l'**empreinte de son commit** (SHA), et les scanners par l'**empreinte de leur image** (L-05) : une étiquette (`v7`) peut être déplacée par un attaquant, une empreinte non.
+- gitleaks et Trivy tournent depuis leurs **images Docker officielles** épinglées, plutôt que par des actions tierces.
+- Le workflow n'a que le droit de **lire** le dépôt (`permissions: contents: read`).
+- Un nouveau push sur la même branche annule l'exécution précédente (`concurrency`).
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `.github/workflows/ci.yml` | créé | la CI |
+| `package.json` | modifié | champ `packageManager: pnpm@11.20.0`, lu par l'action pnpm (une seule version, partout) |
+| `docs/tasks.md` | modifié | T-1.9 cochée une fois la CI vérifiée sur GitHub |
+
+**Vérifié en local (2026-11-08)**
+- Trivy sur l'image : aucune faille élevée ou critique (code de sortie 0).
+- gitleaks sur le dépôt : aucun secret. Sur un dépôt jetable contenant un faux jeton GitHub : `leaks found: 1`, code de sortie 1 (échec attendu).
+- `pnpm audit --audit-level=high` : 1 faille modérée seulement, donc pas bloquante ; aucune exception n'est nécessaire aujourd'hui. Le jour où il en faudra une, elle sera nominative, justifiée et datée dans `pnpm-workspace.yaml` (L-06).
+
+**Écarts avec les documents**
+- Le Dockerfile fixe aussi `pnpm@11.20.0` : la version figure donc à deux endroits (`package.json` et `Dockerfile`). Dependabot devra mettre à jour les deux.

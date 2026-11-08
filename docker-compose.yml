@@ -1,0 +1,35 @@
+# Production (VPS) : l'application derrière Caddy, qui gère le HTTPS.
+# Variables lues dans .env (modèle : .env.example).
+services:
+  app:
+    image: ghcr.io/${GITHUB_OWNER}/rt-dash:${TAG:-latest}
+    env_file: .env
+    restart: unless-stopped
+    # Durcissement du conteneur (design § 16.1, couche 11).
+    read_only: true
+    tmpfs: ["/tmp", "/app/.next/cache"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=${DOMAIN}
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
