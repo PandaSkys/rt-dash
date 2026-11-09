@@ -1,22 +1,22 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getSessionUser = vi.fn();
-vi.mock("@/core/supabase/auth-session", () => ({ getSessionUser: () => getSessionUser() }));
+vi.mock("server-only", () => ({}));
+const readCurrentSessionProfile = vi.fn();
+vi.mock("@/core/auth/current-session", () => ({
+  readCurrentSessionProfile: () => readCurrentSessionProfile(),
+}));
 
 const { default: HomePage } = await import("@/app/page");
 
-const discordUser = {
-  identities: [
-    {
-      provider: "discord",
-      identity_data: { provider_id: "123456789012345678", full_name: "pseudo_discord" },
-    },
-  ],
-};
-
-describe("HomePage", () => {
-  beforeEach(() => getSessionUser.mockResolvedValue(discordUser));
+describe("HomePage (accueil provisoire)", () => {
+  beforeEach(() =>
+    readCurrentSessionProfile.mockResolvedValue({
+      discordId: "123456789012345678",
+      discordUsername: "pseudo_discord",
+      discordDisplayName: "Nom",
+    }),
+  );
 
   it("affiche le titre RT-Dash", async () => {
     render(await HomePage());

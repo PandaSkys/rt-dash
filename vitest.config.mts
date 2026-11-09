@@ -1,6 +1,7 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { readLocalEnvFile } from "./tests/support/local-env";
 
 const sharedConfig = {
   plugins: [react()],
@@ -25,6 +26,8 @@ export default defineConfig({
           name: "integration",
           environment: "node",
           include: ["tests/integration/**/*.test.ts"],
+          // En local : connexions de .env.development.local ; en CI : variables du job.
+          env: readLocalEnvFile(),
         },
       },
     ],

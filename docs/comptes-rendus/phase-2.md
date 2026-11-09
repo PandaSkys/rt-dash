@@ -260,3 +260,262 @@
 - [x] Workflow relu ; commentaires limités au « pourquoi ».
 
 ---
+
+## T-2.6 (première version, Supabase) — interrompue · 2026-11-08
+
+- Écrits et simulés en local, **jamais commités** : `.github/workflows/backup.yml` (`pg_dump` par le pooler Supabase + copie du bucket + `age` + artefact) et `scripts/backup/download-bucket.mts` (+ 6 tests). La simulation complète (dump, copie, chiffrement avec une clé jetable, déchiffrement, image identique) a réussi.
+- Bloquée par l'état de la base cloud (migration jamais appliquée, anciens schémas probables), puis **abandonnée** avec Supabase (ci-dessous). Ces fichiers seront supprimés en T-2.1 (nouvelle version) ; l'idée « tout chiffrer avec `age`, rien en clair » est reprise dans la nouvelle T-2.7.
+- Dossier de simulation laissé dans le répertoire temporaire de la session (`scratchpad\backup-sim`) : suppression bloquée par une sécurité de l'outil, à effacer à la main.
+
+---
+
+## Changement de cap : abandon de Supabase (décision D-06) · 2026-11-08
+
+**Demande de l'utilisateur** : quitter Supabase pour une pile « plus propre », sans les nombreux services inutilisés. Après comparaison (API NestJS séparée, ou Next.js full-stack + Postgres seul), choix : **Next.js full-stack + Postgres seul, dans Docker**. Une API NestJS ne se justifierait que pour d'autres clients (ex. le bot v2) et pourra s'ajouter plus tard.
+
+**Documents modifiés (révision 1.1, validée le 2026-11-09)**
+
+| Fichier | Ce qui change |
+|---|---|
+| `docs/design.md` | § 1 (architecture, principes), § 2 (stack : Postgres 17 Docker, Kysely, dbmate, Discord OAuth2, volume), § 3 (arborescence `db/`, `core/db`, `core/files` ; règle ESLint), § 4 (`rtdash.f_unaccent`, chemins), § 5 (configuration Discord, flux OAuth2 + sessions en base, contrôle côté serveur, premier superadmin), § 6 (rôles `rtdash_owner` / `rtdash_app`, identité déduite par la base du jeton de session, fichiers, test « sans session »), § 7 et § 11 (image copiée sur le volume, `pg_cron` dans l'image), § 13 (images, compose avec `db` et `migrate`, variables, changement de VPS, développement local, sauvegardes par SSH), § 14 (CI/CD ; protection de `main` notée comme reportée), § 15 (sessions de test en base, plus d'`E2E_TEST_AUTH`), § 16 (couches 3, 4, 6, 7, 9 ; tests d'attaque), § 17 (Q-T1, Q-T3, Q-T5, P2-a, P2-b, D-05 révisées ; **D-06**), § 18 (L-01 reformulée, L-02 et L-03 sans objet, L-07 adaptée) |
+| `docs/tasks.md` | phase 2 réécrite (T-2.1 à T-2.7) ; T-0.2 sans objet ; T-0.3 ; T-1.5 (texte) ; phases 3, 5, 6, 7 et 11 ajustées |
+| `CLAUDE.md` | description de la pile, statut, règles de sécurité (rôle `rtdash_app`, `withSession`, ID Discord), chemins des migrations |
+| `docs/prompts-phases.md` | prompt de la phase 2 réécrit ; mentions des phases 3, 6 et 11 |
+| `docs/specs.md` | § 14.4 ajouté (aucune règle fonctionnelle ne change) |
+| `docs/comptes-rendus/phase-2.md` | cette section |
+
+**Propositions à valider en particulier** (marquées **[PROPOSITION]** dans le design)
+1. Kysely + `pg` pour l'accès aux données, dbmate pour les migrations, `arctic` pour l'OAuth Discord.
+2. L'identité côté base : l'application transmet le **jeton de session** (pas un identifiant) à `rtdash.use_session`, qui le vérifie ; seule l'empreinte SHA-256 est stockée.
+3. Sessions de **30 jours** sans prolongation ; purge des sessions expirées depuis 90 jours.
+4. Sauvegardes : script sur le VPS qui chiffre avec `age` et envoie le flux chiffré au workflow GitHub par SSH (artefact 30 jours).
+5. Tests e2e : sessions créées directement en base ; plus aucune route de connexion de test dans l'application.
+
+**Ce que devient le travail déjà fait**
+- Phase 1 : inchangée (Next.js, CSP, Docker, Caddy, CI, Dependabot). `docker-compose.yml`, `.env.example`, `ci.yml` et `deploy.yml` seront adaptés en T-2.1, T-2.5 et T-2.6.
+- Phase 2 (version Supabase, commits `3725605` et `6d0f81e`) : T-2.1 à T-2.5 **décochées** dans `tasks.md` (la phase est réécrite). Réutilisable : la migration et le test structurel (à adapter aux nouveaux rôles), la page `/login` et ses captures, le proxy et la CSP, `discordIdentityOf` (à remplacer par la lecture du profil Discord), les tests e2e d'en-têtes et de connexion.
+- Projet Supabase cloud (T-0.2) : plus utilisé, à supprimer par l'utilisateur quand il le souhaite. L'application Discord (T-0.3) est conservée.
+
+**Points ouverts**
+- Révision 1.1 des documents **validée par l'utilisateur le 2026-11-09**.
+- Les données vivront sur le VPS : les sauvegardes (T-2.7, puis T-11.6 et T-11.8) deviennent critiques.
+
+---
+
+# Phase 2, nouvelle version (D-06) — à partir du 2026-11-09
+
+## T-2.1 — Retrait de Supabase et socle de la base · 2026-11-09
+
+**Ce qui a été fait**
+- **Supabase retiré** : dépendances (`supabase`, `@supabase/supabase-js`, `@supabase/ssr`), dossier `supabase/` (dont `supabase/.env`, après report des identifiants Discord), `src/core/supabase/`, routes `/auth/*`, `discordIdentityOf`, tests associés, job `database` et démarrage de Supabase dans la CI, étapes Supabase de `deploy.yml`. Supabase local arrêté (ses volumes Docker restent sur le disque). Fichiers non suivis de l'ancienne T-2.6 supprimés.
+- **Revenus à leur état de la phase 1** (la connexion revient en T-2.4) : `src/proxy.ts` (CSP seule), `src/app/page.tsx`, `src/app/api/health/route.ts`, leurs tests, `tests/e2e/health.spec.ts`, `playwright.config.ts`. Conservés de la première version : page `/login` et ses captures, `globals.css`, `public/brand/`, `core/config/`, `core/auth/public-paths.ts` (resservira en T-2.4), tests e2e d'en-têtes sur `/login`, nettoyage du DOM entre deux tests.
+- **Image de la base** `db/Dockerfile` : `postgres:17.11-bookworm` épinglée par empreinte (publiée le 2026-11-05, L-05) + `postgresql-17-cron` 1.6.8, `postgresql-17-pgtap` 1.3.4 et `pg_prove` ; `pg_cron` chargé au démarrage, tâches dans la base `rtdash`.
+- **Initialisation** `db/init/01-database-and-roles.sh` (premier démarrage seulement) : rôles `rtdash_owner` (migrations) et `rtdash_app` (application, `NOBYPASSRLS`), base `rtdash` à `rtdash_owner`, connexion fermée à `PUBLIC`, aucune création possible dans `public` pour l'application, extension `pg_cron` (exige un superutilisateur) avec l'usage du schéma `cron` donné à `rtdash_owner`.
+- **`compose.dev.yml`** : la base seule, port publié sur `127.0.0.1` uniquement, mots de passe de développement par défaut ; contrôle de santé **par TCP**, sinon Postgres paraît prêt pendant son initialisation (serveur temporaire sur socket local).
+- **Scripts** : `pnpm db:up`, `db:migrate` (dbmate 2.37.0 avec le rôle propriétaire, table de suivi `rtdash.schema_migrations`), `db:reset`, `db:test` (`pg_prove` dans le conteneur), `db:types` (kysely-codegen 0.20.0). Les connexions sont lues dans `.env.development.local` s'il existe (`node --env-file-if-exists`), sinon dans l'environnement (CI).
+- **Client** `core/db/client.ts` (Kysely 0.29.8 + `pg` 8.23.1, `server-only`) et `core/db/database-url.ts` : refuse toute `DATABASE_URL` qui n'utilise pas `rtdash_app`.
+- **ESLint** : `kysely`, `pg` et `@/core/db/client` interdits hors `core/db`, `queries/` et `actions/` (vérifié avec un fichier jetable : 2 refus) ; le fichier de types généré n'est plus relu par ESLint.
+- **`.env.development.local`** (non versionné) réécrit : `APP_URL`, `DATABASE_URL`, `DATABASE_OWNER_URL` (base locale, `sslmode=disable`), et tes identifiants Discord **reportés depuis `supabase/.env` sans être affichés** (19 et 32 caractères).
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `db/Dockerfile`, `db/init/01-database-and-roles.sh` | créés | image et initialisation de la base |
+| `db/tests/database-and-roles.test.sql` | créé | pgTAP : rôles, propriétaire, privilèges, `pg_cron` |
+| `db/migrations/` | créé (vide) | migrations dbmate (T-2.2) |
+| `compose.dev.yml` | créé | base locale |
+| `scripts/db/run-dbmate.mjs`, `scripts/db/generate-types.mjs` | créés | dbmate et kysely-codegen avec la bonne connexion ; kysely-codegen lancé sans shell (sous Windows, `cmd` interprète les parenthèses de `env(…)`) |
+| `src/core/db/client.ts`, `database-url.ts` | créés | accès à la base |
+| `src/core/db/database.types.ts` | créé (généré) | types (vides pour l'instant) |
+| `tests/unit/core/db/database-url.test.ts` | créé | rôle imposé, variable absente, mot de passe jamais affiché |
+| `tests/integration/db/client.test.ts` | créé | connexion réelle en `rtdash_app`, création de table refusée |
+| `vitest.config.mts` | modifié | les tests d'intégration lisent `.env.development.local` (`util.parseEnv` de Node, sans nouvelle dépendance) |
+| `package.json`, `pnpm-lock.yaml` | modifiés | dépendances et scripts `db:*` |
+| `eslint.config.mjs`, `.prettierignore` | modifiés | client de la base, fichier généré |
+| `.dockerignore` | modifié | `db/` et `compose.dev.yml` hors du contexte de l'image de l'application |
+| `.github/workflows/ci.yml`, `deploy.yml` | modifiés | étapes Supabase retirées (base en CI : T-2.5 ; migrations par SSH : T-2.6) |
+| `README.md` | modifié | pile, base locale, scripts |
+| fichiers Supabase listés plus haut | supprimés | retrait de Supabase |
+| `src/proxy.ts`, `src/app/page.tsx`, `src/app/api/health/route.ts`, `playwright.config.ts`, `tests/e2e/health.spec.ts`, `tests/unit/app/page.test.tsx`, `tests/unit/app/api/health/route.test.ts` | rétablis | état de la phase 1 |
+| `docs/design.md`, `docs/tasks.md`, `CLAUDE.md`, `docs/comptes-rendus/phase-2.md` | modifiés | révision 1.1 marquée validée ; cette section |
+
+**Comment vérifier**
+1. `pnpm db:up` puis `pnpm db:test` : 9 tests, `Result: PASS`.
+2. `pnpm db:types` : régénère `src/core/db/database.types.ts`.
+3. `pnpm test` (36 tests, dont 2 d'intégration sur la base locale), `pnpm test:e2e` (6 tests).
+
+**Tests** : `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅ · `pnpm test` ✅ (36) · `pnpm db:test` ✅ (9) · `pnpm test:e2e` ✅ (6) · `actionlint` ✅
+
+**Écarts avec les documents**
+- **`db:reset` et `db:migrate`** : dbmate refuse de tourner sans aucune migration ; vérifiés de bout en bout avec la première migration (T-2.2, 2026-11-09). T-2.1 cochée à ce moment-là.
+- URL de connexion avec `sslmode=disable` : dbmate exige TLS par défaut ; la base n'est joignable qu'en local ou par le réseau Docker interne (design § 6.1).
+- Les paquets `pg_cron` et pgTAP ne sont pas épinglés à une version précise (dépôt PGDG) ; l'image de base, elle, l'est.
+
+**Hors périmètre, non fait**
+- `.env.example` mentionne encore Supabase : il est réécrit en T-2.6 avec les variables de production (design § 13.3).
+
+**Points ouverts**
+- Les volumes Docker de Supabase local (`supabase_*_rt-dash`) et ton ancien `.env.local` restent sur ta machine ; tu peux les supprimer quand tu veux.
+
+**Relecture**
+- [x] Code relu ; commentaires limités au « pourquoi ».
+
+---
+
+## T-2.2 — Première migration, droits par défaut fermés · 2026-11-09
+
+**Ce qui a été fait**
+- **Test d'abord** : test structurel pgTAP (20 vérifications), repris de la première version et adapté aux rôles `rtdash_owner` / `rtdash_app`. Il échoue si : une table de `public` n'a pas la RLS ; `PUBLIC` a un droit sur une table, une vue, une séquence ou une fonction ; `rtdash_app` a `DELETE` ou `TRUNCATE`, possède un objet, accède directement à une table interne (`rtdash`), ou peut modifier une colonne protégée ; une fonction `security definer` n'a pas de `search_path`. Il crée aussi, avec le rôle `rtdash_owner`, une table, une séquence et une fonction « sondes » et vérifie qu'elles naissent sans aucun droit. Plus : extensions, `rtdash.f_unaccent`, types `enum`, schéma `rtdash` fermé.
+- Échecs constatés avant la migration (schéma `rtdash` absent, extensions absentes, fonction sonde exécutable par `PUBLIC`).
+- **Migration** `db/migrations/20261109073930_foundation.sql` (dbmate) : droit d'exécution implicite de `PUBLIC` retiré pour toutes les fonctions de `rtdash_owner` ; schéma `extensions` avec `pg_trgm` et `unaccent` ; `pg_cron` (déjà installé par l'initialisation) ; schéma `rtdash` fermé ; types `app_role`, `ticket_status`, `data_source` ; `rtdash.f_unaccent`.
+- **Contre-épreuve** : sans la ligne des droits par défaut, les tests 3 et 11 échouent ; migration remise à l'identique ensuite.
+- dbmate range sa table de suivi dans `rtdash.schema_migrations` (propriétaire `rtdash_owner`), fermée à `rtdash_app` (test 8).
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `db/migrations/20261109073930_foundation.sql` | créé | la migration |
+| `db/tests/structure.test.sql` | créé | test structurel (design § 6.6) |
+| `src/core/db/database.types.ts` | régénéré | inchangé : kysely-codegen ne produit les `enum` qu'avec les tables qui les utilisent |
+| `docs/comptes-rendus/phase-2.md`, `docs/tasks.md` | modifiés | cette section ; T-2.1 et T-2.2 cochées |
+
+**Comment vérifier** : `pnpm db:reset` (applique la migration) puis `pnpm db:test` : 2 fichiers, 29 tests, `Result: PASS`.
+
+**Tests** : `pnpm db:test` ✅ (29) · `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅ · `pnpm test` ✅ (36)
+
+**Écarts avec les documents**
+- Les droits par défaut ne sont retirés que pour les **fonctions** : dans un Postgres sans Supabase, tables et séquences naissent déjà sans droit pour les autres rôles. Les sondes du test le prouvent pour les trois.
+- `pg_trgm` et `unaccent` sont rangées dans un schéma `extensions`, pour que `public` ne contienne que nos objets.
+- Le test 2 ignore les objets d'extensions (comme le test 3), car pgTAP, installé pour le test, ajoute deux vues ouvertes dans `public`.
+
+**Hors périmètre, non fait** : aucun. **Points ouverts** : aucun.
+
+**Relecture**
+- [x] Migration et tests relus ; commentaires limités au « pourquoi ».
+
+---
+
+## T-2.3 — Sessions en base · 2026-11-09
+
+**Ce qui a été fait**
+- **Tests d'abord** : pgTAP `db/tests/sessions.test.sql` (18 tests, joués avec le rôle `rtdash_app`) : ouverture ; seule l'empreinte SHA-256 est stockée et le jeton n'apparaît nulle part ; durée de 30 jours ; table illisible par l'application ; jeton valide accepté, inventé, absent, fermé ou expiré refusé ; fermer une session ne touche pas aux autres ; jeton trop court et ID Discord invalide refusés ; purge des seules sessions expirées depuis plus de 90 jours ; purge programmée par `pg_cron`. Intégration `tests/integration/db/session-store.test.ts` (4 tests) sur la vraie base. Échecs constatés avant le code.
+- **Migration** `20261109074220_sessions.sql` : table interne `rtdash.sessions` ; `open_session` et `close_session` (`security definer`) ; `rtdash.use_session` (retient le jeton pour la transaction s'il est valide) ; `rtdash.current_session()` (revérifie le jeton à chaque appel) ; `current_discord_profile()` (pseudo de la session, pour « Vous n'avez pas accès ») ; `rtdash.purge_expired_sessions()` programmée chaque jour à 03:00 (UTC). Droits accordés un par un à `rtdash_app`.
+- **Application** : `generateSessionToken()` (32 octets aléatoires, base64url) ; `withSession(token, fn)` (transaction qui commence par `rtdash.use_session`) ; `openSession`, `closeSession`, `readSessionProfile`.
+- Le test structurel (T-2.2) reste vert avec ces nouveaux objets : table interne fermée à `rtdash_app`, fonctions `security definer` avec `search_path`, rien d'exécutable par `PUBLIC`.
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `db/migrations/20261109074220_sessions.sql` | créé | sessions en base |
+| `db/tests/sessions.test.sql` | créé | pgTAP des sessions |
+| `src/core/auth/session-token.ts`, `discord-profile.ts` | créés | jeton de session, type du profil Discord |
+| `src/core/db/with-session.ts`, `session-store.ts` | créés | transaction portant la session ; ouverture, lecture, fermeture |
+| `tests/unit/core/auth/session-token.test.ts`, `tests/integration/db/session-store.test.ts` | créés | tests |
+| `docs/comptes-rendus/phase-2.md` | modifié | cette section |
+
+**Comment vérifier** : `pnpm db:reset`, `pnpm db:test` (3 fichiers, 47 tests), `pnpm test` (42 tests dont 6 d'intégration).
+
+**Tests** : `pnpm db:test` ✅ (47) · `pnpm test` ✅ (42) · `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅
+
+**Écarts avec les documents**
+- `current_discord_profile()` est ajoutée pour lire le pseudo de la session avant que les comptes RT-Dash existent ; `current_viewer()` (phase 3) s'appuiera sur la même session.
+- Le test « sans session » du design § 6.6 (aucune ligne **métier** lisible) n'a pas encore d'objet : il n'existe aucune table métier. Il sera écrit avec les premières tables (T-3.1).
+
+**🧑 À faire par l'utilisateur** : ajouter la redirection `http://localhost:3000/auth/callback` dans l'application Discord (nécessaire pour l'essai réel de T-2.4). Les identifiants Discord sont déjà dans `.env.development.local` (reportés en T-2.1).
+
+**Relecture**
+- [x] Migration et code relus ; commentaires limités au « pourquoi ».
+
+---
+
+## T-2.4 — Connexion Discord · 2026-11-09
+
+**Ce qui a été fait**
+- **`/auth/login`** (lien GET) : crée `state` et code PKCE (`arctic` 3.7.0), les garde 10 minutes dans un cookie `httpOnly`, puis envoie vers `discord.com/oauth2/authorize` avec le seul scope `identify` (aucun e-mail).
+- **`/auth/callback`** : relit la tentative et refuse un `state` différent ou un retour sans cookie ; échange le code (secret côté serveur), lit `GET /users/@me` (`id`, `username`, `global_name`), **oublie le jeton Discord**, ouvre la session en base et pose le cookie `__Host-rtdash_session` (`httpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, 30 jours). La tentative est effacée dans tous les cas (usage unique). En cas d'échec : `/login?erreur=connexion`.
+- **`/auth/logout`** (POST) : ferme la session **en base** puis efface le cookie. Un cookie `__Host-` ne s'efface que si l'ordre d'effacement reprend `Secure` et `Path=/`, ce que `cookies.delete()` de Next ne fait pas : les deux cookies sont donc effacés avec les options de leur création (tests à l'appui).
+- **`proxy.ts`** : sans cookie de session, redirection vers `/login` (pages publiques : `/login`, `/auth/login`, `/auth/callback`, `/api/health` ; fichiers `brand/` exclus). Il ne valide ni la session ni les rôles. CSP inchangée.
+- **`/api/health`** : 200 `{status:"ok", database:"ok"}` si la base répond en moins de 3 s, sinon 503.
+- **Accueil provisoire** : pseudo de la session (lu par la base) et bouton « Se déconnecter ». Page `/login` reprise de la première version.
+- **E2E** : la connexion de test crée la session **directement en base** (rôle propriétaire) ; l'application n'a aucune route de test (design § 15).
+- **Essai réel le 2026-11-09** : 🧑 redirection `http://localhost:3000/auth/callback` ajoutée par l'utilisateur dans l'application Discord ; connexion avec son compte → l'accueil affiche son pseudo ; une session active en base, ID Discord valide (valeurs non affichées). « Se déconnecter » → `/login`, session **fermée** en base, `/` renvoie de nouveau vers `/login`.
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `src/core/auth/discord-oauth.ts` | créé | départ vers Discord, échange du code, lecture du profil |
+| `src/core/auth/discord-user.ts` | créé | lecture et contrôle de la réponse `/users/@me` |
+| `src/core/auth/login-attempt.ts` | créé | `state` + PKCE dans un cookie, vérification au retour |
+| `src/core/auth/session-cookie.ts` | créé | nom et options des cookies (création, effacement) |
+| `src/core/auth/current-session.ts` | créé | jeton et profil de la session de la requête |
+| `src/core/auth/auth-urls.ts` | créé | adresses d'accueil et de `/login` |
+| `src/core/db/database-health.ts` | créé | santé de la base |
+| `src/app/auth/login/route.ts`, `callback/route.ts`, `logout/route.ts` | créés | les trois étapes |
+| `src/proxy.ts`, `src/app/page.tsx`, `src/app/api/health/route.ts` | modifiés | redirection sans session, accueil, santé de la base |
+| `tests/unit/core/auth/discord-user.test.ts`, `login-attempt.test.ts`, `tests/unit/app/auth/*/route.test.ts`, `tests/unit/proxy.test.ts` | créés | tests du flux |
+| `tests/unit/app/page.test.tsx`, `tests/unit/app/api/health/route.test.ts` | modifiés | accueil, santé |
+| `tests/integration/db/database-health.test.ts` | créé | santé sur la vraie base |
+| `tests/e2e/auth.spec.ts` | créé | redirection, départ vers Discord, erreur, parcours complet avec session en base |
+| `tests/e2e/health.spec.ts` | modifié | nouvelle réponse |
+| `tests/support/local-env.ts` | créé | lecture de `.env.development.local`, partagée par Vitest et Playwright |
+| `playwright.config.ts`, `vitest.config.mts` | modifiés | connexions de test ; identifiant Discord factice si absent (CI), aucun vrai secret |
+| `package.json`, `pnpm-lock.yaml` | modifiés | `arctic` |
+| `docs/comptes-rendus/phase-2.md`, `docs/tasks.md` | modifiés | cette section, T-2.4 cochée |
+
+**Comment vérifier**
+1. `pnpm db:up`, `pnpm dev`, http://localhost:3000 → `/login` → « Se connecter avec Discord » → accueil avec ton pseudo → « Se déconnecter » → `/login`.
+2. `pnpm test` (69), `pnpm test:e2e` (10), `pnpm db:test` (47).
+
+**Tests** : écrits d'abord, échecs constatés, puis le code. `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm format:check` ✅ · `pnpm test` ✅ (69) · `pnpm test:e2e` ✅ (10) · `pnpm db:test` ✅ (47) · connexion et déconnexion réelles ✅
+
+**Écarts avec les documents**
+- Dans le test e2e, le cookie de session est posé avec `domain` + `path` : Playwright refuse un cookie `Secure` posé par `url` sur `http://localhost`. Vérifié à part que le navigateur accepte bien le cookie `__Host-` posé par le serveur sur `localhost` (le vrai flux).
+- Le jeton d'accès Discord n'est pas révoqué auprès de Discord après usage, seulement oublié (il expire de lui-même). Le révoquer coûterait un appel de plus à chaque connexion ; à décider si tu le souhaites.
+
+**Hors périmètre, non fait** : aucun.
+
+**Points ouverts**
+- Captures de `/login` (écran hors maquette) toujours à valider : `docs/comptes-rendus/captures/phase-2-login.png` et `phase-2-login-erreur.png`.
+
+**Relecture**
+- [x] Code relu comme un nouveau venu le lirait ; fonctions courtes, logique pure testée à part.
+
+---
+
+## T-2.5 — CI avec la base · 2026-11-09
+
+**En clair** : la CI compte de nouveau **quatre** vérifications. « Base de données et tests d'intégration » construit l'image `db/`, rejoue toutes les migrations sur une base vide, lance pgTAP et les tests d'intégration, puis régénère les types et échoue s'ils diffèrent de ceux du dépôt. L'e2e tourne sur le build de production branché sur cette base. Les **deux** images (application et base) sont scannées par Trivy, et `deploy.yml` publie aussi l'image de la base sur GHCR (`rt-dash-db`).
+
+**Ce qui a été fait**
+- `ci.yml` : connexions de test au niveau du workflow (mots de passe de développement de `compose.dev.yml`, sans valeur ailleurs ; gitleaks : aucune fuite) ; nouveau job `database` (`pnpm db:up`, `db:migrate`, `db:test`, `test:integration`, contrôle des types) ; base démarrée dans le job e2e ; scan Trivy de l'image de la base.
+- `deploy.yml` : publication de `ghcr.io/<owner>/rt-dash-db:<sha>` et `:latest` à côté de l'image de l'application.
+- **Trouvé par le scan** : l'image officielle `postgres` contient `gosu`, petit binaire Go compilé avec une version ancienne de Go (26 failles HIGH/CRITICAL de la bibliothèque standard Go). `gosu` ne sert qu'à quitter root au démarrage. **Correctif** plutôt qu'exception : le conteneur tourne directement en `USER postgres` et `gosu` est supprimé. La base ne tourne donc plus jamais en root. Vérifié : processus 1 en uid 999 (`postgres`), base recréée, 47 tests pgTAP verts, Trivy sans aucune faille.
+
+**Fichiers créés ou modifiés**
+
+| Fichier | Créé / modifié | Pourquoi |
+|---|---|---|
+| `.github/workflows/ci.yml` | modifié | job `database`, base dans l'e2e, scan de l'image de la base |
+| `.github/workflows/deploy.yml` | modifié | publication de l'image de la base |
+| `db/Dockerfile` | modifié | `USER postgres`, `gosu` retiré |
+| `.gitleaks.toml` | créé | règles par défaut de gitleaks + exception nominative et datée pour les ID Discord **inventés** des tests (`123456789012345678`, `223456789012345678`), pris à tort pour des identifiants d'application. Contre-essai : un faux jeton GitHub aléatoire est toujours détecté. |
+| `docs/comptes-rendus/phase-2.md` | modifié | cette section |
+
+**Vérifié en local (2026-11-09)** : séquence du job `database` rejouée depuis une base vide (2 migrations, pgTAP ✅, intégration ✅ 7 tests, types régénérés identiques) ; Trivy sur les deux images ✅ ; `actionlint` ✅ ; gitleaks sur `.github/` ✅.
+
+**Reste à vérifier sur GitHub** : après le commit. **T-2.5 sera cochée une fois les quatre jobs verts.**
+
+**Écarts avec les documents** : `USER postgres` et le retrait de `gosu` ne sont pas décrits au design § 13.1 ; ils en renforcent l'esprit (comme l'utilisateur non root de l'image de l'application).
+
+**Hors périmètre, non fait** : aucun.
+
+**Points ouverts** : le nouveau job s'appellera « Base de données et tests d'intégration » et le job des images « Images Docker et scan Trivy » (à reprendre si la protection de `main` est posée un jour).
+
+**Relecture**
+- [x] Workflows et Dockerfile relus.
+
+---

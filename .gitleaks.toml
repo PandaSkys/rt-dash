@@ -1,0 +1,8 @@
+# Configuration de gitleaks (CI, design § 16.1 couche 9) : toutes les règles par défaut,
+# plus une exception nominative pour des valeurs de test inventées.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "ID Discord inventés des tests (2026-11-09) : la règle discord-client-id les prend pour un identifiant d'application ; ce ne sont pas des secrets"
+regexes = ['''^[12]23456789012345678$''']

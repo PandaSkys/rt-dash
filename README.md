@@ -1,6 +1,6 @@
 # RT-Dash
 
-Dashboard d'administration d'une VTC Euro Truck Simulator 2 (TruckersMP) : Next.js (TypeScript), Supabase, Docker, GitHub Actions.
+Dashboard d'administration d'une VTC Euro Truck Simulator 2 (TruckersMP) : Next.js (TypeScript), Postgres 17 (Docker), Docker Compose, GitHub Actions.
 
 ## Documentation
 
@@ -13,13 +13,26 @@ Dashboard d'administration d'une VTC Euro Truck Simulator 2 (TruckersMP) : Next.
 ## Prérequis
 
 - Node.js 24 et pnpm 11 (`corepack enable` ou `npm install --global pnpm@11`).
-- Docker (pour l'image et, à partir de la phase 2, Supabase local).
+- Docker (image de l'application et base Postgres locale).
 
 ## Lancer en local
 
 ```bash
 pnpm install
+pnpm db:reset       # base locale neuve (Docker) + migrations
 pnpm dev            # http://localhost:3000
+```
+
+Les connexions locales vont dans `.env.development.local` (jamais commité) : `APP_URL`, `DATABASE_URL` (rôle `rtdash_app`), `DATABASE_OWNER_URL` (rôle `rtdash_owner`, migrations), identifiants Discord.
+
+## Base de données
+
+```bash
+pnpm db:up          # démarre la base locale (compose.dev.yml)
+pnpm db:migrate     # applique les nouvelles migrations (db/migrations, dbmate)
+pnpm db:reset       # repart d'une base vide
+pnpm db:test        # tests pgTAP (db/tests)
+pnpm db:types       # régénère src/core/db/database.types.ts
 ```
 
 ## Vérifications (les mêmes qu'en CI)
@@ -28,7 +41,7 @@ pnpm dev            # http://localhost:3000
 pnpm lint           # ESLint, zéro avertissement toléré
 pnpm typecheck      # TypeScript
 pnpm format:check   # Prettier
-pnpm test           # tests unitaires et d'intégration (Vitest)
+pnpm test           # tests unitaires et d'intégration (Vitest ; base locale démarrée)
 pnpm test:e2e       # build de production + tests Playwright
 ```
 
@@ -45,7 +58,7 @@ En production, `docker-compose.yml` lance l'application derrière Caddy (HTTPS a
 
 ## Variables d'environnement
 
-Le modèle commenté est [`.env.example`](.env.example) : il liste **uniquement** les variables du serveur (design § 13.3). Les copier dans `.env` (serveur) ou `.env.local` (poste), jamais commités. Les secrets de la CI (clé `service_role`, connexions à la base, accès SSH) ne vont que dans les secrets GitHub.
+Le modèle commenté est [`.env.example`](.env.example) : il liste **uniquement** les variables du serveur (design § 13.3). Les copier dans `.env` (serveur) ou `.env.local` (poste), jamais commités. Les secrets du déploiement (accès SSH, clé publique des sauvegardes) ne vont que dans les secrets GitHub.
 
 ## CI/CD
 

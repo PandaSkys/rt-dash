@@ -9,9 +9,10 @@ on:
 permissions:
   contents: read
 
+# Base des tests (compose.dev.yml, image db/) : mots de passe de test, sans valeur ailleurs.
 env:
-  # Services de Supabase local inutiles aux tests : démarrage plus rapide.
-  SUPABASE_UNUSED_SERVICES: realtime,imgproxy,mailpit,studio,edge-runtime,logflare,vector,supavisor
+  DATABASE_URL: postgres://rtdash_app:app-local@127.0.0.1:5432/rtdash?sslmode=disable
+  DATABASE_OWNER_URL: postgres://rtdash_owner:owner-local@127.0.0.1:5432/rtdash?sslmode=disable
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -60,18 +61,16 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Supabase local (services utiles aux tests seulement)
-        run: pnpm exec supabase start --exclude ${{ env.SUPABASE_UNUSED_SERVICES }}
-      - name: Migrations rejouées depuis zéro
-        run: pnpm db:reset
+      - name: Base de données (image db/, migrations rejouées depuis zéro)
+        run: pnpm db:up && pnpm db:migrate
       - name: Tests de la base (pgTAP, design § 6.6)
         run: pnpm db:test
-      - name: Tests d'intégration (Supabase local complet, L-07)
+      - name: Tests d'intégration (vraie base, L-07)
         run: pnpm test:integration
       - name: Types générés à jour
         run: |
           pnpm db:types
-          if ! git diff --exit-code -- src/core/supabase/database.types.ts; then
+          if ! git diff --exit-code -- src/core/db/database.types.ts; then
             echo "::error::Types non à jour : lancer pnpm db:types et commiter le résultat."
             exit 1
           fi
@@ -88,8 +87,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Supabase local (services utiles aux tests seulement)
-        run: pnpm exec supabase start --exclude ${{ env.SUPABASE_UNUSED_SERVICES }}
+      - name: Base de données (image db/, migrations rejouées depuis zéro)
+        run: pnpm db:up && pnpm db:migrate
       - name: Build de production puis tests e2e
         run: pnpm test:e2e
       - if: failure()
@@ -100,13 +99,19 @@ jobs:
           retention-days: 7
 
   image:
-    name: Image Docker et scan Trivy
+    name: Images Docker et scan Trivy
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker build --tag rt-dash:ci .
+      - run: docker build --tag rt-dash-db:ci db
       - name: Aucune vulnérabilité élevée ou critique corrigeable dans l'image
         run: >
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
           aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
           image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed rt-dash:ci
+      - name: Aucune vulnérabilité élevée ou critique corrigeable dans l'image de la base
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+          image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed rt-dash-db:ci

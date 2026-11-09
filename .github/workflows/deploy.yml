@@ -27,7 +27,7 @@ env:
 
 jobs:
   image:
-    name: Image GHCR
+    name: Images GHCR
     # Seulement si la CI est verte, et jamais pour un redéploiement d'image existante.
     if: >
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
@@ -59,6 +59,14 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:${{ steps.sha.outputs.tag }}
             ${{ env.IMAGE }}:latest
+      - name: Image de la base (db/), mêmes étiquettes
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: db
+          push: true
+          tags: |
+            ${{ env.IMAGE }}-db:${{ steps.sha.outputs.tag }}
+            ${{ env.IMAGE }}-db:latest
 
   deploy:
     name: Migrations et mise à jour du VPS
@@ -75,21 +83,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}
-      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
-        with:
-          version: 3.0.0
-      - name: "Migrations de la base (pooler en mode session, IPv4, L-02)"
-        run: supabase db push --db-url "$DATABASE_URL_MIGRATIONS"
-        env:
-          DATABASE_URL_MIGRATIONS: ${{ secrets.DATABASE_URL_MIGRATIONS }}
-      - name: Premier superadmin (sans effet s'il en existe déjà un actif)
-        run: >
-          psql "$DATABASE_URL_MIGRATIONS" -v ON_ERROR_STOP=1
-          -v discord_id="$BOOTSTRAP_SUPERADMIN_DISCORD_ID"
-          -c "select rtdash.bootstrap_superadmin(:'discord_id')"
-        env:
-          DATABASE_URL_MIGRATIONS: ${{ secrets.DATABASE_URL_MIGRATIONS }}
-          BOOTSTRAP_SUPERADMIN_DISCORD_ID: ${{ secrets.BOOTSTRAP_SUPERADMIN_DISCORD_ID }}
+      # Migrations et premier superadmin : par SSH sur le VPS (docker compose run migrate),
+      # réécrits en T-2.6 (design § 14).
       - name: Mise à jour du VPS par SSH (empreinte du serveur vérifiée)
         run: |
           install -m 700 -d ~/.ssh

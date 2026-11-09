@@ -3,10 +3,10 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
 
 const TEST_FILES = ["tests/**", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"];
-const GENERATED_FILES = ["src/core/supabase/database.types.ts"];
-// Dossiers autorisés à importer le client Supabase (design § 3.2), plus les tests qui les vérifient.
-const SUPABASE_ALLOWED_FILES = [
-  "src/core/supabase/**",
+const GENERATED_FILES = ["src/core/db/database.types.ts"];
+// Dossiers autorisés à importer le client de la base (design § 3.2), plus les tests qui les vérifient.
+const DATABASE_CLIENT_ALLOWED_FILES = [
+  "src/core/db/**",
   "src/**/queries/**",
   "src/**/actions/**",
   "tests/**",
@@ -29,9 +29,9 @@ const securityAndTypingRules = {
     {
       patterns: [
         {
-          group: ["@supabase/*", "@/core/supabase/server-client"],
+          group: ["kysely", "pg", "@/core/db/client"],
           message:
-            "Le client Supabase ne s'importe que depuis core/supabase, queries/ ou actions/ (design § 3.2).",
+            "Le client de la base ne s'importe que depuis core/db, queries/ ou actions/ (design § 3.2).",
         },
       ],
     },
@@ -41,7 +41,8 @@ const securityAndTypingRules = {
 export default defineConfig([
   ...nextVitals,
   ...nextTypescript,
-  globalIgnores([".next/**", "out/**", "coverage/**", "next-env.d.ts"]),
+  // Les fichiers générés (types de la base) ne sont pas relus par ESLint.
+  globalIgnores([".next/**", "out/**", "coverage/**", "next-env.d.ts", ...GENERATED_FILES]),
   {
     settings: {
       "import/resolver": { typescript: { alwaysTryTypes: true } },
@@ -49,11 +50,11 @@ export default defineConfig([
     rules: { ...readabilityRules, ...securityAndTypingRules },
   },
   {
-    files: SUPABASE_ALLOWED_FILES,
+    files: DATABASE_CLIENT_ALLOWED_FILES,
     rules: { "no-restricted-imports": "off" },
   },
   {
-    files: [...TEST_FILES, ...GENERATED_FILES],
+    files: TEST_FILES,
     rules: { "max-lines": "off", "max-lines-per-function": "off" },
   },
 ]);

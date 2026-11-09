@@ -21,19 +21,21 @@ Points d'attention :
 Méthode (CLAUDE.md et Mode d'emploi de tasks.md) : une tâche à la fois ; tests d'abord ; ne modifie que ce que la tâche demande ; compte rendu de chaque tâche dans docs/comptes-rendus/phase-1.md (modèle _modele.md), avec chaque fichier touché et pourquoi ; ne me demande jamais de coller un secret ; commits signés, et seulement avec mon accord. À la fin de la phase : bilan, puis arrête-toi et attends ma validation.
 ```
 
-## Phase 2 — Supabase (local et cloud), base et authentification Discord
+## Phase 2 — Base Postgres (Docker), sessions et connexion Discord
 
 ```text
-On continue RT-Dash : PHASE 2 de docs/tasks.md (T-2.1 à T-2.6).
+On continue RT-Dash : PHASE 2 de docs/tasks.md (T-2.1 à T-2.7, version révisée du 2026-11-08, D-06).
 
-Lis entièrement CLAUDE.md, docs/specs.md, docs/design.md (§ 2, § 4, § 5, § 6, § 13, § 14, § 18) et docs/tasks.md. Vérifie que la phase 1 est cochée et que son compte rendu est validé ; sinon, dis-le-moi et arrête-toi.
+Lis entièrement CLAUDE.md, docs/specs.md, docs/design.md (§ 1, § 2, § 4, § 5, § 6, § 13, § 14, § 15, § 17 D-06, § 18) et docs/tasks.md, puis docs/comptes-rendus/phase-2.md (première version de la phase, avec Supabase : ce qui est réutilisable).
 
 Points d'attention :
-- Supabase « classique » : client supabase-js côté serveur avec la session de l'utilisateur, RLS, fonctions SQL, migrations et types par la CLI Supabase. Pas d'ORM.
+- Plus de Supabase : Postgres 17 dans Docker (image db/ avec pg_cron et pgTAP), Kysely côté serveur, migrations dbmate, rôles rtdash_owner (migrations) et rtdash_app (application, soumis à la RLS). Pas d'ORM.
+- T-2.1 : retirer proprement tout Supabase du code, de la CI et des dépendances.
 - T-2.2 : droits par défaut fermés et test structurel pgTAP dès la première migration (design § 6.6).
-- T-2.3 : je dois ajouter la redirection locale dans l'application Discord ; guide-moi pas à pas. Les identifiants Discord ne passent jamais par la discussion.
-- T-2.6 : guide-moi pour générer la paire de clés age ; la clé privée reste chez moi.
-- Leçons L-01, L-02, L-03 et L-07 du design § 18.
+- T-2.3 : la base vérifie elle-même le jeton de session (rtdash.use_session) ; seule l'empreinte est stockée. Je dois ajouter la redirection locale dans l'application Discord et remplir mes identifiants dans .env.development.local : guide-moi pas à pas. Les identifiants Discord ne passent jamais par la discussion.
+- T-2.4 : Discord OAuth2 avec state et PKCE, scope identify seul, jetons Discord jamais stockés.
+- T-2.7 : guide-moi pour générer la paire de clés age ; la clé privée reste chez moi.
+- Leçons L-01 et L-07 du design § 18.
 
 Méthode habituelle (CLAUDE.md, Mode d'emploi) : une tâche à la fois, tests d'abord, périmètre strict, compte rendu de chaque tâche dans docs/comptes-rendus/phase-2.md, pas de secret dans la discussion, commits signés avec mon accord. Fin de phase : bilan, puis arrêt jusqu'à ma validation.
 ```
@@ -46,11 +48,11 @@ On continue RT-Dash : PHASE 3 de docs/tasks.md (T-3.1 à T-3.8, y compris T-3.4b
 Lis entièrement CLAUDE.md, docs/specs.md (§ 2), docs/design.md (§ 3.2, § 5, § 6, § 16, § 18) et docs/tasks.md. Vérifie que la phase 2 est cochée et validée ; sinon, arrête-toi.
 
 Points d'attention :
-- Phase la plus sensible pour la sécurité : RLS de app_users et activity_log, triggers d'audit (acteur lu dans le jeton), has_permission en SQL + permissionsOf en TypeScript + test de concordance, admin_save_user en SQL + canApplyUserChange en TypeScript testés sur la même table de cas, defineAction et le test de la matrice des droits.
-- L'ID Discord se lit dans auth.identities, jamais dans user_metadata (L-01) : un test le prouve.
+- Phase la plus sensible pour la sécurité : RLS de app_users et activity_log, triggers d'audit (acteur déduit de la session), has_permission en SQL + permissionsOf en TypeScript + test de concordance, admin_save_user en SQL + canApplyUserChange en TypeScript testés sur la même table de cas, defineAction et le test de la matrice des droits.
+- L'ID Discord vient uniquement de la session (lue par le serveur sur Discord), jamais d'une donnée envoyée par le navigateur (L-01) : un test prouve qu'une session inventée ou d'un autre utilisateur ne permet pas d'agir à sa place.
 - Page « Vous n'avez pas accès » : exactement docs/design/maquette/Acces.dc.html.
 - Paramètres → Utilisateurs : hors maquette, découpé en petits composants ; montre-moi une capture.
-- Premier superadmin local via supabase/seed.sql (ID 640173855096307712).
+- Premier superadmin local via db/seed.sql (ID 640173855096307712).
 
 Méthode habituelle : une tâche à la fois, tests d'abord (pgTAP et Vitest), périmètre strict, compte rendu dans docs/comptes-rendus/phase-3.md, pas de secret dans la discussion, commits signés avec mon accord. Fin de phase : bilan, puis arrêt jusqu'à ma validation.
 ```
@@ -98,7 +100,7 @@ Lis entièrement CLAUDE.md, docs/specs.md (§ 6, § 7), docs/design.md (§ 3.2, 
 Points d'attention :
 - Page Convoi : exactement docs/design/maquette/Convoi.dc.html (sauf la colonne d'aperçu, phase 8), découpée par section, état du formulaire dans un hook.
 - Accent grave ` refusé dans les champs affichés en code (R-CNV-09).
-- Envoi d'image sécurisé (premiers octets, 8 Mo, ré-encodage, bucket privé, URL signée), testé avec un fichier piégé.
+- Envoi d'image sécurisé (premiers octets, 8 Mo, ré-encodage, volume privé, route qui relit le ticket sous RLS), testé avec un fichier piégé.
 - « Actualiser » : différences avant d'écraser ; complète aussi un ticket créé à la main.
 - Écrans hors maquette (Actualiser, liste des convois, paramètres de l'outil) : captures à valider.
 
@@ -179,7 +181,7 @@ Lis entièrement CLAUDE.md, docs/specs.md, docs/design.md (§ 13 à § 16) et do
 
 Points d'attention :
 - Prérequis à me demander : le nom de domaine (Q-25) et l'accès à mon VPS Debian 12 (SSH par clé). Je débute en hébergement : guide-moi pas à pas.
-- T-11.3 : revue de sécurité complète, y compris l'appel direct de l'API Supabase avec un vrai jeton de chaque rôle. Rapport dans docs/security-review.md. AUCUNE mise en production tant qu'un point bloquant reste ouvert.
+- T-11.3 : revue de sécurité complète, y compris des requêtes SQL directes avec le rôle de l'application et une vraie session de chaque rôle, et la vérification que le port Postgres est injoignable de l'extérieur. Rapport dans docs/security-review.md. AUCUNE mise en production tant qu'un point bloquant reste ouvert.
 - T-11.8 : teste une vraie restauration de sauvegarde avant la mise en production, et écris docs/runbook.md.
 - Avant le premier déploiement en production, arrête-toi et demande ma confirmation explicite.
 

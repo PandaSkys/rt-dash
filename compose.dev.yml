@@ -1,0 +1,24 @@
+# Développement local (design § 13.5) : la base seule, joignable uniquement depuis ce poste.
+# Mots de passe de développement, sans valeur hors de cette machine.
+name: rt-dash-dev
+
+services:
+  db:
+    build: ./db
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      RTDASH_OWNER_PASSWORD: ${RTDASH_OWNER_PASSWORD:-owner-local}
+      RTDASH_APP_PASSWORD: ${RTDASH_APP_PASSWORD:-app-local}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/tests:/db-tests:ro
+    healthcheck:
+      # Par TCP : pendant l'initialisation, le serveur temporaire n'écoute que sur le socket local.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "rtdash"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  db_data: {}

@@ -458,7 +458,7 @@ Les propositions R-TKT-05 (ticket créé à la main) et R-CNV-08 (valeurs par d�
 | Sujet | Décision |
 |---|---|
 | Image de référence | Ajoutée : `docs/design/reference-dashboard.png`. |
-| Supabase | Hébergé (**cloud**). |
+| Supabase | Hébergé (**cloud**). *Remplacé le 2026-11-08 : voir § 14.4.* |
 | Entreprise | `vtc.name` de l'API si présent, sinon saisie manuelle. |
 | RDV | Prérempli depuis `meetup_at` de l'API, modifiable. |
 | Serveur | Prérempli depuis `server.name` de l'API, modifiable. |
@@ -520,3 +520,9 @@ Les propositions R-TKT-05 (ticket créé à la main) et R-CNV-08 (valeurs par d�
 | Code | Repris de zéro dans un nouveau dossier à partir de ces documents (design.md D-01). Les comptes de la phase 0 sont conservés. |
 | Technique | Supabase « classique » à la place de Drizzle (design.md Q-T1). **Aucune règle de ces spécifications ne change.** |
 | Méthode | Code découpé et lisible (design.md § 3.2), compte rendu après chaque tâche, périmètre strict (tasks.md, « Mode d'emploi »). |
+
+### 14.4 Abandon de Supabase (2026-11-08)
+
+| Sujet | Décision |
+|---|---|
+| Technique | Postgres seul dans Docker, connexion Discord et sessions gérées par l'application, images sur un volume (design.md D-06). **Aucune règle de ces spécifications ne change.** |

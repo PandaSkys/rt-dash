@@ -1,7 +1,8 @@
 # RT-Dash — Design technique
 
-> Statut : **RÉVISION 1.0 du 2026-11-02, à relire avant la reprise** (version 0.5 validée le 2026-10-15).
-> Changements de la 1.0 : Supabase « classique » à la place de Drizzle (§ 1, 2, 5, 6, 13, 14, 15, 16), conventions de code (§ 3.2), comptes rendus et périmètre strict (§ 17), leçons de la première tentative (§ 18).
+> Statut : **RÉVISION 1.1 du 2026-11-08, validée le 2026-11-09** (révision 1.0 du 2026-11-02 ; version 0.5 validée le 2026-10-15).
+> Changements de la 1.1 (décision D-06) : **Supabase abandonné**. Postgres seul dans Docker, accès par Kysely, connexion Discord et sessions gérées par l'application, fichiers sur un volume Docker (§ 1, 2, 3, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18). Le schéma, les règles et la méthode ne changent pas.
+> Changements de la 1.0 : Supabase « classique » à la place de Drizzle, conventions de code (§ 3.2), comptes rendus et périmètre strict (§ 17), leçons de la première tentative (§ 18).
 > Documents liés : [specs.md](specs.md) (règles `R-…`, questions `Q-…`) · [tasks.md](tasks.md) · [../CLAUDE.md](../CLAUDE.md)
 
 Références visuelles à garder ouvertes : [`design/reference-dashboard.png`](design/reference-dashboard.png) (structure et style), [`design/maquette/`](design/maquette/) (valeurs exactes), [`design/discord/`](design/discord/) (message réel, image et source), [`design/logos/`](design/logos/).
@@ -13,24 +14,22 @@ Références visuelles à garder ouvertes : [`design/reference-dashboard.png`](d
 ## 1. Vue d'ensemble
 
 ```
-                    ┌──────────────────────── VPS (Docker Compose) ────────────────────────┐
- Navigateur ──HTTPS──▶  Caddy (TLS auto)  ──▶  app : Next.js (Server Components, Server Actions) │
-                    └───────────────────────────────────┬──────────────────────────────────┘
-                                                        │ supabase-js, côté serveur uniquement,
-                                                        │ avec la session de l'utilisateur connecté
-              ┌──────────────────────────┬──────────────┴──────────────┬───────────────────────┐
-              ▼                          ▼                             ▼                       ▼
-   Supabase Auth (Discord)    Supabase API → Postgres         Supabase Storage          API TruckersMP
-   session en cookies         RLS par rôle, fonctions SQL     bucket privé,             api.truckersmp.com/v2
-                              (RPC), triggers d'audit,        règles par rôle
-                              pg_cron (archivage)
+                ┌─────────────────────────────── VPS (Docker Compose) ───────────────────────────────┐
+ Navigateur ─HTTPS─▶ Caddy (TLS auto) ─▶ app : Next.js (Server Components, Server Actions, routes)   │
+                │                          │  Kysely, côté serveur uniquement, chaque transaction     │
+                │                          │  porte la session de l'utilisateur          volume :     │
+                │                          ▼                                              images de    │
+                │                    db : Postgres 17 (réseau interne seulement)          trajet       │
+                │                    RLS par droit, fonctions SQL, triggers d'audit, pg_cron           │
+                └─────────────────────────────────────────────────────────────────────────────────────┘
+        app ──▶ Discord (OAuth2, connexion)      app ──▶ API TruckersMP (api.truckersmp.com/v2)
 ```
 
 Principes :
-1. **Supabase « classique »** : le client officiel `supabase-js` (avec `@supabase/ssr`) est utilisé **côté serveur uniquement**, avec la session (jeton) de l'utilisateur connecté. Le navigateur n'appelle jamais Supabase directement. Conséquences : aucune variable `NEXT_PUBLIC_*`, et **la même image Docker pour tous les environnements**.
-2. **Deux barrières de sécurité** : (a) Next.js vérifie le droit avant chaque action (`defineAction`, § 16) ; (b) Postgres le revérifie avec les **règles RLS** de Supabase, puisque chaque requête porte l'identité de l'utilisateur. Une erreur dans l'une est rattrapée par l'autre.
-3. **La base garantit les règles critiques** : interdiction de supprimer, archives figées, motif de refus obligatoire, historique automatique. L'auteur de chaque modification est lu dans le jeton signé (`auth.uid()`) et ne peut donc pas être falsifié.
-4. **La clé secrète Supabase (`service_role`, qui contourne la RLS) n'est jamais sur le VPS** : elle reste dans les secrets GitHub, pour les sauvegardes et la création du premier superadmin.
+1. **Une seule application, une base, rien d'inutile** (D-06) : Next.js full-stack et Postgres, chacun dans son conteneur. Le navigateur ne parle qu'à Next.js ; la base n'est jamais exposée hors du réseau Docker. Aucune variable `NEXT_PUBLIC_*`, et **la même image Docker de l'application pour tous les environnements**.
+2. **Deux barrières de sécurité** : (a) Next.js vérifie le droit avant chaque action (`defineAction`, § 16) ; (b) Postgres le revérifie avec ses **règles RLS**, car chaque transaction porte la session de l'utilisateur (§ 6.1). Une erreur dans l'une est rattrapée par l'autre.
+3. **La base garantit les règles critiques** : interdiction de supprimer, archives figées, motif de refus obligatoire, historique automatique. L'auteur de chaque modification est **déduit par la base de la session** (jeton de session vérifié en base), jamais d'un identifiant envoyé par le code ; il ne peut donc pas être choisi librement.
+4. **L'application n'a que les droits dont elle a besoin** : elle se connecte avec un rôle Postgres restreint (`rtdash_app`), soumis à la RLS, sans droit de modifier le schéma. Les migrations utilisent un autre rôle (`rtdash_owner`).
 5. **Les outils sont des modules** déclarés dans un registre (§ 3.1). La coque (barre latérale, accueil, recherche, notifications) se construit à partir de ce registre.
 6. **Une seule fonction pure génère le message Discord** (§ 9). L'aperçu v1 et le bot v2 l'utilisent tous les deux.
 7. **Le code est découpé et lisible par un humain** (§ 3.2) : petits composants, hooks, logique métier pure à part, accès aux données isolé.
@@ -44,18 +43,18 @@ Principes :
 | Langage | TypeScript (strict) | Imposé. |
 | Framework | **Next.js**, dernière version stable, App Router, `output: "standalone"` | Imposé (full-stack). Le mode standalone produit une image Docker légère. |
 | Runtime | Node.js LTS (24) | Base des images Docker officielles. |
-| Base de données | PostgreSQL **Supabase cloud** (plan gratuit) | Décision. |
-| Accès aux données | **`@supabase/supabase-js` + `@supabase/ssr`**, côté serveur, avec la session de l'utilisateur (décidé le 2026-11-02, Q-T1) | Modèle Supabase standard : règles RLS, fonctions SQL appelées par RPC, types TypeScript générés par la CLI. Pas d'ORM, pas de connexion directe à Postgres depuis l'application. |
-| Migrations et types | **CLI Supabase** : `supabase/migrations/*.sql`, `supabase db push`, `supabase gen types typescript` | Un seul outil pour le local, la CI et la production. |
-| Authentification | Supabase Auth, fournisseur Discord | Imposé (Discord uniquement). |
-| Fichiers | Supabase Storage (bucket privé `route-images`, règles par rôle) | Images de trajet. |
+| Base de données | **PostgreSQL 17 dans Docker** (image `db/` : image officielle + `pg_cron` + pgTAP), sur le VPS, réseau interne uniquement (D-06) | Une base, rien d'autre. Données sur un volume Docker, sauvegardées chaque jour (§ 13.6). |
+| Accès aux données | **Kysely** + `pg` (node-postgres), côté serveur uniquement **[PROPOSITION]** | Requêtes SQL typées, sans « magie » ni couche cachée ; les fonctions SQL s'appellent comme des requêtes. Pas d'ORM. |
+| Migrations et types | **dbmate** (fichiers SQL `db/migrations/*.sql`) **[PROPOSITION]** ; types par **kysely-codegen** (`pnpm db:types`) | SQL pur, un seul outil en local, en CI et en production ; types générés depuis la base, jamais écrits à la main. |
+| Authentification | **Discord OAuth2** géré par l'application (code + `state` + PKCE, bibliothèque `arctic` **[PROPOSITION]**), sessions en base | Imposé (Discord uniquement). Scope `identify` seul : aucun e-mail. |
+| Fichiers | Volume Docker `route-images`, servi par une route qui vérifie le droit | Images de trajet. |
 | UI | Tailwind CSS v4 + **shadcn/ui** (Radix) + `lucide-react` | Imposé (shadcn). Les icônes de la maquette sont des tracés Lucide. |
 | Formulaires | React Hook Form + Zod | Validation partagée entre client et serveur ; `watch()` alimente l'aperçu en direct. |
 | Dates | `date-fns` + `@date-fns/tz`, plus `Intl.DateTimeFormat('fr-FR')` | Conversion UTC ↔ Europe/Paris avec changement d'heure (R-TIME-02). |
 | Recherche (UI) | Composant `Command` de shadcn (cmdk) | Palette façon Spotlight (R-SRC-01). |
 | Graphique | Composant `Chart` de shadcn (Recharts) | Graphique d'activité (R-DSH-02). |
 | Emojis de l'aperçu | Twemoji | Rendu identique à Discord. Licence CC-BY 4.0 : attribution dans « À propos ». |
-| Tests | Vitest, Testing Library, Playwright, **pgTAP** (`supabase test db`) | § 15. |
+| Tests | Vitest, Testing Library, Playwright, **pgTAP** (`pnpm db:test`, `pg_prove` dans l'image de la base) | § 15. |
 | Qualité | ESLint (règles de lisibilité du § 3.2, zéro avertissement toléré), Prettier, `tsc --noEmit` | Lancés par la CI. |
 | Gestionnaire de paquets | pnpm | Rapide, fichier de verrouillage strict. |
 | Conteneurs | Docker + Docker Compose, Caddy | Imposé ; Caddy gère le HTTPS automatiquement. |
@@ -74,10 +73,11 @@ RT-Dash/
 │  ├─ specs.md · design.md · tasks.md · prompts-phases.md
 │  ├─ comptes-rendus/           un fichier par phase : phase-1.md, phase-2.md… (modèle : _modele.md)
 │  └─ design/                   ressources visuelles et fichiers de référence
-├─ supabase/
-│  ├─ config.toml               Supabase local (CLI)
-│  ├─ migrations/               SQL versionné : tables, RLS, droits, fonctions, triggers, cron
-│  ├─ tests/                    tests pgTAP (RLS par rôle, triggers, structure) → `supabase test db`
+├─ db/
+│  ├─ Dockerfile                image Postgres 17 + pg_cron + pgTAP (local, CI, production)
+│  ├─ init/                     création des rôles et de la base au premier démarrage du conteneur
+│  ├─ migrations/               SQL versionné (dbmate) : tables, RLS, droits, fonctions, triggers, cron
+│  ├─ tests/                    tests pgTAP (RLS par rôle, triggers, structure) → `pnpm db:test`
 │  └─ seed.sql                  données du développement local uniquement
 ├─ src/
 │  ├─ app/                      routes Next.js : pages FINES qui chargent les données et assemblent des composants
@@ -90,8 +90,9 @@ RT-Dash/
 │  │  ├─ api/health/route.ts
 │  │  └─ globals.css            TOKENS DE DESIGN (§ 10)
 │  ├─ core/                     socle partagé, sans logique d'outil
-│  │  ├─ supabase/              server-client.ts · database.types.ts (généré, jamais modifié à la main)
-│  │  ├─ auth/                  get-viewer.ts · require-permission.ts · discord-identity.ts
+│  │  ├─ db/                    client.ts (pool, transaction avec la session) · database.types.ts (généré)
+│  │  ├─ auth/                  discord-oauth.ts · session-cookie.ts · get-viewer.ts · require-permission.ts
+│  │  ├─ files/                 stockage des images de trajet (volume)
 │  │  ├─ actions/               define-action.ts · action-result.ts
 │  │  ├─ permissions/           roles.ts · permissions.ts · user-admin-rules.ts
 │  │  ├─ tools/                 types.ts · registry.ts
@@ -150,8 +151,8 @@ La coque filtre `TOOLS` avec `can(viewer, tool.requires)`. Si aucun outil n'est 
 - **Un composant = une responsabilité = un fichier** `PascalCase.tsx`. Dès qu'un composant mélange plusieurs choses (afficher, gérer un état, charger des données), on le découpe. Repère : au-delà d'environ 150 lignes, découper.
 - **Composants de présentation** (props → affichage, sans état métier) séparés des **composants conteneurs** (état, appel d'actions).
 - **État et logique d'interface** → hooks dédiés `use-xxx.ts` exportant `useXxx`.
-- **Logique métier pure** → dossier `domain/` : fonctions sans React ni Supabase, testées en unitaire.
-- **Accès aux données isolé** : lectures dans `queries/`, écritures dans `actions/`. Un composant n'importe **jamais** le client Supabase.
+- **Logique métier pure** → dossier `domain/` : fonctions sans React ni base de données, testées en unitaire.
+- **Accès aux données isolé** : lectures dans `queries/`, écritures dans `actions/`. Un composant n'importe **jamais** le client de la base.
 - **Une Server Action par fichier**, toujours construite avec `defineAction` (§ 16).
 - Les primitives `components/ui/` (shadcn) ne contiennent aucune logique métier.
 
@@ -177,7 +178,7 @@ La coque filtre `TOOLS` avec `can(viewer, tool.requires)`. Si aucun outil n'est 
 | `complexity` / `max-depth` | 10 / 3 | Logique lisible |
 | `max-params` | 3 (au-delà : un objet) | Appels lisibles |
 | `import/no-cycle` | — | Dépendances saines entre dossiers |
-| `no-restricted-imports` | client Supabase interdit hors `core/supabase`, `queries/`, `actions/` | Accès aux données isolé |
+| `no-restricted-imports` | client de la base (`kysely`, `pg`, `@/core/db/client`) interdit hors `core/db`, `queries/`, `actions/` | Accès aux données isolé |
 | `react/no-danger`, `@typescript-eslint/no-explicit-any` | erreur | Sécurité et typage |
 
 **Relecture** : avant de rendre une tâche, l'auteur relit son code comme un nouveau venu le lirait et refactorise ce qui n'est pas clair. Le compte rendu de la tâche le confirme (tasks.md, « Mode d'emploi »).
@@ -193,13 +194,13 @@ La coque filtre `TOOLS` avec `can(viewer, tool.requires)`. Si aucun outil n'est 
 
 Les champs du convoi sont remplis dès l'ajout (données API), mais **ne sont modifiables qu'au statut `accepted`**. Avant, seuls les pays (pop-up) et « Actualiser » peuvent les changer.
 
-Le schéma ci-dessous est écrit dans `supabase/migrations/`. Les droits d'accès (RLS, colonnes modifiables, fonctions) sont décrits au § 6. Les types TypeScript sont générés à partir de la base (`database.types.ts`), jamais écrits à la main.
+Le schéma ci-dessous est écrit dans `db/migrations/`. Les droits d'accès (RLS, colonnes modifiables, fonctions) sont décrits au § 6. Les types TypeScript sont générés à partir de la base (`database.types.ts`), jamais écrits à la main.
 
 ```sql
 -- Extensions
 create extension if not exists pg_trgm;
 create extension if not exists unaccent;
-create extension if not exists pg_cron;      -- disponible sur Supabase
+create extension if not exists pg_cron;      -- installée dans l'image db/
 
 -- Types
 create type app_role      as enum ('event_manager','communication','manager','hr','direction','superadmin');
@@ -300,7 +301,7 @@ create table tickets (
   tb_url                text not null default '',
   instructions          text not null default '',     -- copie du modèle à l'acceptation (R-CNV-05)
   route_image_tmp_url   text,                         -- image `map` de l'API
-  route_image_path      text,                         -- fichier envoyé ou copié (Storage)
+  route_image_path      text,                         -- fichier envoyé ou copié (volume route_images)
   updated_at            timestamptz not null default now(),
   updated_by            uuid references app_users(id),
 
@@ -312,7 +313,7 @@ create unique index tickets_active_event_uniq on tickets (tmp_event_id) where ar
 create index tickets_status_idx    on tickets (status) where archived_at is null;
 create index tickets_departure_idx on tickets (departure_at);
 create index tickets_search_idx    on tickets using gin (
-  (f_unaccent(lower(display_name || ' ' || company_name || ' ' || departure_city || ' ' || arrival_city))) gin_trgm_ops);
+  (rtdash.f_unaccent(lower(display_name || ' ' || company_name || ' ' || departure_city || ' ' || arrival_city))) gin_trgm_ops);
 
 -- Vue de lecture : archivage « effectif » (R-ARC-07)
 create view tickets_v as
@@ -335,38 +336,47 @@ create index activity_entity_idx on activity_log (entity_type, entity_id, occurr
 create index activity_recent_idx on activity_log (occurred_at desc);
 ```
 
-`f_unaccent` est une fonction `immutable` qui enveloppe `unaccent`, ce qui la rend indexable. Les colonnes `created_by` et `actor_id` à `null` sont affichées « Système ». La vue `tickets_v` est créée avec `security_invoker = true`, pour que la RLS de `tickets` s'y applique.
+`rtdash.f_unaccent` (schéma interne) est une fonction `immutable` qui enveloppe `unaccent`, ce qui la rend indexable. Les colonnes `created_by` et `actor_id` à `null` sont affichées « Système ». La vue `tickets_v` est créée avec `security_invoker = true`, pour que la RLS de `tickets` s'y applique.
 
 ---
 
 ## 5. Authentification Discord et vérification des rôles
 
 ### 5.1 Configuration (une seule fois)
-1. **Discord Developer Portal** : créer une application, puis dans OAuth2 ajouter les URLs de redirection :
-   - `https://<projet>.supabase.co/auth/v1/callback` (production) ;
-   - `http://127.0.0.1:54321/auth/v1/callback` (Supabase local, § 13.5).
-2. **Supabase cloud → Authentication → Providers → Discord** : coller le Client ID et le Client Secret de Discord. En local : section `[auth.external.discord]` de `supabase/config.toml`, avec ces valeurs lues dans des variables d'environnement (jamais commitées).
-3. **Supabase → Authentication → URL Configuration** : `Site URL = APP_URL` ; `Redirect URLs` = `APP_URL/auth/callback` (+ `http://localhost:3000/auth/callback` en local).
-4. Scope demandé : `identify`. **Écart accepté le 2026-10-21** : relevé sur une vraie connexion, Supabase Auth ajoute toujours `email`. L'e-mail est stocké par Supabase dans `auth.users` ; RT-Dash ne le lit, ne le copie ni ne l'affiche jamais.
+1. **Discord Developer Portal**, application « RT-Dash » → OAuth2 → **Redirects** :
+   - `APP_URL/auth/callback` en production (ex. `https://rt-dash.example.org/auth/callback`) ;
+   - `http://localhost:3000/auth/callback` en local (§ 13.5).
+   Les anciennes redirections vers Supabase (`…supabase.co/auth/v1/callback`, `127.0.0.1:54321`) peuvent être retirées.
+2. Le **Client ID** et le **Client Secret** sont des variables d'environnement de l'application (`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`) : `.env` du VPS (droits 600) et `.env.development.local` en local, jamais commités (§ 13.3).
+3. Scope demandé : **`identify` seul**. Sans Supabase, aucun e-mail n'est demandé ni reçu (L-03 est sans objet).
 
-### 5.2 Flux
+### 5.2 Flux **[PROPOSITION]**
 ```
-/login ──(action serveur signInWithOAuth{provider:'discord', redirectTo: APP_URL/auth/callback})──▶ Discord
-Discord ──▶ Supabase ──▶ /auth/callback?code=… ──(exchangeCodeForSession)──▶ cookies de session
-/auth/callback : appelle la fonction sync_my_profile() (nom affiché, pseudo, dernière connexion) ──▶ /
+/login ── lien ──▶ /auth/login : crée state + code_verifier (PKCE), les garde 10 min dans un cookie
+                   httpOnly, puis redirige vers discord.com/oauth2/authorize (scope identify)
+Discord ──▶ /auth/callback?code&state : vérifie state, échange le code (avec le secret, côté serveur),
+            lit GET /users/@me (id, username, global_name), oublie les jetons Discord,
+            ouvre une session en base (open_session) et pose le cookie de session ──▶ /
+/auth/logout (POST) : ferme la session en base (close_session) et efface le cookie ──▶ /login
 ```
+- **Jetons Discord** : utilisés une seule fois pour lire le profil, puis jetés ; jamais stockés.
+- **Session** : jeton aléatoire de 32 octets, dans le cookie `__Host-rtdash_session` (`httpOnly`, `Secure`, `SameSite=Lax`, `Path=/`). La base ne garde que son **empreinte SHA-256**, jamais le jeton.
+- **Durée** : 30 jours, sans prolongation ; une session peut être fermée avant (déconnexion). **[PROPOSITION]**
+- Table interne `rtdash.sessions` (`id`, `token_hash` unique, `discord_id`, `discord_username`, `discord_display_name`, `created_at`, `expires_at`, `revoked_at`) : ni lisible ni modifiable par l'application en direct, seulement par les fonctions `open_session`, `close_session` et `rtdash.use_session` (`security definer`). Une session n'est jamais supprimée, seulement fermée ; les sessions expirées depuis plus de 90 jours sont purgées par `pg_cron` (donnée technique, pas une donnée métier). **[PROPOSITION]**
+- Une session existe aussi pour une personne **non enregistrée** : elle sert à afficher son pseudo sur `/acces-refuse` (R-ACC-03), sans donner accès à rien.
 
 ### 5.3 Contrôle côté serveur (R-ACC-02..05)
-- **`proxy.ts`** (Next 16) : rafraîchit les cookies de session (modèle `@supabase/ssr`). Sans session, il redirige vers `/login`. Il ne vérifie **pas** les rôles : on ne se fie jamais au proxy seul.
-- **Client Supabase serveur** (`core/supabase/server-client.ts`) : créé à chaque requête avec les cookies de l'utilisateur. Toutes les requêtes partent donc avec son jeton, et Postgres applique la RLS en son nom.
+- **`proxy.ts`** (Next 16) : sans cookie de session, redirige vers `/login` (pages publiques : `/login`, `/auth/login`, `/auth/callback`, `/api/health`). Il ne valide **pas** la session et ne vérifie **pas** les rôles : on ne se fie jamais au proxy seul.
+- **Client de la base** (`core/db/client.ts`) : un pool de connexions avec le rôle `rtdash_app`. Toute requête faite pour un utilisateur passe par `withSession(token, (db) => …)`, qui ouvre une transaction et appelle d'abord `rtdash.use_session(token)` : la base vérifie elle-même le jeton (empreinte, non expirée, non fermée) et en déduit l'utilisateur pour la durée de la transaction (§ 6.1).
 - **`getViewer()`** (mis en cache par requête avec `React.cache`) :
-  1. `supabase.auth.getUser()`, qui valide le jeton auprès de Supabase Auth ;
-  2. appel de la fonction SQL `current_viewer()`, qui renvoie le compte RT-Dash actif correspondant. **L'ID Discord est lu dans `auth.identities`** (ligne `provider = 'discord'`, colonne `provider_id`), remplie par Supabase à partir de Discord, et **jamais dans `user_metadata`**. L'utilisateur peut modifier lui-même `user_metadata` avec sa session et se faire passer pour un autre compte (leçon du 2026-10-21) ;
+  1. lit le cookie de session ;
+  2. appelle la fonction SQL `current_viewer()` dans `withSession` : compte RT-Dash **actif** dont l'ID Discord est celui de la session ;
   3. calcule les droits du rôle avec `permissionsOf()` (§ 5.4) ;
-  4. renvoie `Viewer { id, role, isAccountant, displayName, permissions }`, ou `null` si aucun compte actif.
+  4. renvoie `Viewer { id, role, isAccountant, displayName, permissions }`, ou `null` (pas de session valide, compte absent ou désactivé).
+- **L'ID Discord vient uniquement de Discord** : lu par le serveur sur `GET /users/@me` avec le jeton obtenu lors de l'échange du code, puis gardé dans la session en base. Aucune donnée envoyée par le navigateur ne peut le changer (L-01).
 - `(app)/layout.tsx` : `viewer === null` → `redirect('/acces-refuse')`.
 - **Chaque Server Action** est construite avec `defineAction({ permission, input, run })` (§ 16.1, couche 4). **Chaque Route Handler** appelle `requirePermission(perm)`. Comme le rôle est relu à chaque requête, un changement de rôle s'applique immédiatement (R-ACC-05).
-- `/acces-refuse` affiche le pseudo Discord de la session (`discordIdentityOf(user)` : `identities[]` → `provider = 'discord'` → `identity_data`) et un seul bouton, « Se déconnecter ».
+- `/acces-refuse` affiche le pseudo Discord de la session et un seul bouton, « Se déconnecter ».
 
 ### 5.4 Droits (R-ROLE-09)
 Les droits sont **rangés par outil** et calculés à partir du registre (§ 3.1). Ajouter un outil ajoute ses droits sans toucher au reste.
@@ -389,11 +399,11 @@ function permissionsOf(user: { role: AppRole; isAccountant: boolean }): Set<Perm
 Règles d'administration des comptes (R-ROLE-05/07/08, Q-08) : écrites en SQL dans la fonction `admin_save_user(...)`, qui fait foi. Elles sont reproduites en TypeScript dans `canApplyUserChange(actor, target, change)`, pour afficher ou masquer les boutons. Les deux sont testées sur **la même table de cas** (toutes combinaisons rôle de l'acteur × rôle de la cible × type de changement).
 
 ### 5.5 Premier superadmin (R-ACC-07)
-Fonction SQL `rtdash.bootstrap_superadmin(discord_id text)`, exécutable **uniquement** par le rôle `service_role` et sans effet si un superadmin actif existe déjà. Elle est appelée :
-- en production, par le workflow de déploiement avec `BOOTSTRAP_SUPERADMIN_DISCORD_ID` (secret GitHub) ;
-- en local, par `supabase/seed.sql`.
+Fonction SQL `rtdash.bootstrap_superadmin(discord_id text)`, exécutable **uniquement** par le propriétaire de la base (`rtdash_owner`) et sans effet si un superadmin actif existe déjà. Elle est appelée :
+- en production, par le workflow de déploiement (SSH, `psql` dans le conteneur de la base) avec `BOOTSTRAP_SUPERADMIN_DISCORD_ID` (secret GitHub) ;
+- en local, par `db/seed.sql`.
 
-L'application elle-même n'a jamais besoin de la clé `service_role`.
+L'application (rôle `rtdash_app`) ne peut pas l'exécuter.
 
 ---
 
@@ -402,14 +412,17 @@ L'application elle-même n'a jamais besoin de la clé `service_role`.
 ### 6.1 Modèle d'accès
 | Rôle Postgres | Qui | Droits |
 |---|---|---|
-| `anon` | requête sans session | **aucun** droit sur les tables et fonctions de l'application |
-| `authenticated` | utilisateur connecté (son jeton) | lecture selon la RLS ; écriture **uniquement** sur les colonnes explicitement accordées, sous RLS ; jamais `DELETE` ni `TRUNCATE` |
-| `service_role` | CI uniquement (sauvegardes, premier superadmin) | contourne la RLS ; **jamais** sur le VPS |
+| `postgres` (superutilisateur) | création du conteneur seulement (`db/init/`) | crée la base `rtdash` et les deux rôles ci-dessous ; jamais utilisé par l'application ni par les migrations |
+| `rtdash_owner` | migrations (dbmate), premier superadmin, sauvegardes | propriétaire du schéma ; **jamais** utilisé par l'application |
+| `rtdash_app` | l'application Next.js | `NOBYPASSRLS`, aucun droit sur le schéma ; lecture selon la RLS ; écriture **uniquement** sur les colonnes explicitement accordées, sous RLS ; jamais `DELETE` ni `TRUNCATE` ; exécution des seules fonctions accordées |
 
+- **Identité dans la base** : en début de chaque transaction faite pour un utilisateur, l'application appelle `rtdash.use_session(jeton)` (`security definer`). La fonction calcule l'empreinte du jeton, vérifie que la session existe, n'est ni expirée ni fermée, et la retient pour la transaction (`set_config(…, true)`). `rtdash.current_app_user_id()` en déduit le compte RT-Dash **actif** dont l'ID Discord est celui de la session. Sans session valide : `null`.
+- **Pourquoi le jeton et pas un identifiant** : l'application ne transmet jamais « je suis l'utilisateur X ». Pour agir au nom de quelqu'un, il faudrait connaître son jeton de session, qui n'est stocké nulle part en clair (la base ne garde que l'empreinte, et `rtdash_app` ne peut pas lire `rtdash.sessions`). Choisir un identifiant ne suffit donc pas pour agir au nom de quelqu'un.
+- **Limites assumées** : (1) la base fait confiance à l'application pour lui transmettre le jeton reçu dans le cookie ; (2) `open_session`, appelée après la vérification auprès de Discord, est **le seul point** où la base accepte une identité Discord fournie par l'application : c'est le point de confiance du système, couvert par les tests du flux de connexion et par la revue de sécurité (T-11.3). C'est acceptable parce que la base n'est joignable que depuis le réseau Docker interne et seulement par l'application, avec des requêtes toujours paramétrées.
 - Être connecté à Discord ne suffit pas : toutes les règles RLS passent par `rtdash.has_permission()`, qui renvoie `false` sans compte RT-Dash **actif** (R-ACC-02).
-- **Fonctions SQL appelables (RPC)** : schéma `public`, `security invoker` par défaut (la RLS s'applique). `security definer` seulement quand c'est indispensable (lire `auth.identities`, écrire l'historique, création du premier superadmin), toujours avec `set search_path = ''` et une vérification explicite du droit en première ligne.
-- **Fonctions internes** (non appelables par l'API) : schéma `rtdash` (`has_permission`, `current_app_user_id`, triggers).
-- Postgres donne par défaut le droit d'exécuter toute nouvelle fonction à tout le monde (`PUBLIC`). Ce droit est **retiré par défaut** (`alter default privileges … revoke execute … from public`), puis accordé fonction par fonction à `authenticated`.
+- **Fonctions SQL appelées par l'application** : schéma `public`, `security invoker` par défaut (la RLS s'applique). `security definer` seulement quand c'est indispensable (sessions, écrire l'historique, création du premier superadmin), toujours avec `set search_path = ''` et une vérification explicite du droit en première ligne.
+- **Fonctions internes** : schéma `rtdash` (`use_session`, `has_permission`, `current_app_user_id`, triggers). `rtdash_app` n'exécute que celles qui lui sont explicitement accordées.
+- Postgres donne par défaut le droit d'exécuter toute nouvelle fonction à tout le monde (`PUBLIC`). Ce droit est **retiré par défaut** (`alter default privileges for role rtdash_owner … revoke …`), puis accordé fonction par fonction à `rtdash_app`.
 
 ### 6.2 Règles RLS et droits par table
 
@@ -420,14 +433,15 @@ L'application elle-même n'a jamais besoin de la clé `service_role`.
 | `countries`, `cities` | `convoys:read` | — (fonction `complete_cities`, page Villes) | `convoys:write` (colonnes autorisées) |
 | `settings` | `<outil>:read` (selon le préfixe de la clé) | — | `<outil>:settings` |
 | `activity_log` | selon le type d'élément (`ticket`, `city`, `country`, `setting` → `convoys:read` ; `user` → `users:manage`) | — (triggers uniquement) | jamais |
-| Storage `route-images` | `convoys:read` | `convoys:write` | `convoys:write` |
+| Fichiers `route-images` (volume) | `convoys:read`, vérifié par la route qui sert le fichier en lisant le ticket sous RLS | `convoys:write` (Server Action) | `convoys:write` |
 
-**Colonnes protégées** : les colonnes de parcours et de traçabilité ne sont **jamais** accordées en écriture à `authenticated` : `status`, `handler_id`, `handled_at`, `accepted_by`, `accepted_at`, `convoy_initialized_at`, `refusal_reason`, `archived_*`, `created_*`, `updated_*`. Elles ne changent qu'à travers les fonctions SQL ou les triggers. Personne ne peut donc, même en appelant l'API directement, se faire passer pour un autre ou changer un statut sans passer par les règles.
+**Colonnes protégées** : les colonnes de parcours et de traçabilité ne sont **jamais** accordées en écriture à `rtdash_app` : `status`, `handler_id`, `handled_at`, `accepted_by`, `accepted_at`, `convoy_initialized_at`, `refusal_reason`, `archived_*`, `created_*`, `updated_*`. Elles ne changent qu'à travers les fonctions SQL ou les triggers. Personne ne peut donc, même avec une requête SQL directe sous le rôle de l'application, se faire passer pour un autre ou changer un statut sans passer par les règles.
 
-### 6.3 Fonctions SQL (RPC) de la v1
+### 6.3 Fonctions SQL de la v1
 | Fonction | Rôle | Type |
 |---|---|---|
-| `current_viewer()` | compte RT-Dash actif de l'utilisateur connecté (via `auth.identities`) | definer |
+| `open_session(...)` · `close_session()` | ouverture d'une session après la connexion Discord ; fermeture (déconnexion) | definer |
+| `current_viewer()` | compte RT-Dash actif de la session (ID Discord de la session) ; pseudo Discord de la session | definer |
 | `sync_my_profile(display_name, username)` | met à jour nom affiché, pseudo et dernière connexion **de son propre compte** | definer |
 | `admin_save_user(...)` | ajout ou modification d'un compte, avec les règles R-ROLE-05..08 et Q-08 | definer |
 | `take_ticket(id)` · `accept_ticket(id)` · `refuse_ticket(id, reason)` · `change_ticket_status(id, status)` | transitions de statut (R-TKT-10..15). `accept_ticket` initialise le convoi à la 1re acceptation : consignes et valeurs par défaut dans les champs vides | invoker |
@@ -435,29 +449,29 @@ L'application elle-même n'a jamais besoin de la clé `service_role`.
 | `complete_cities(ticket_id, choices)` | pop-up des villes, en une transaction (§ 8.3) | invoker |
 | `search_tickets(q)` · `search_cities(q)` | recherche approximative (§ 12.1) | invoker |
 | `rtdash.archive_due_tickets()` | archivage automatique (pg_cron, § 11) | interne |
-| `rtdash.bootstrap_superadmin(discord_id)` | premier superadmin (§ 5.5) | interne, `service_role` seulement |
+| `rtdash.bootstrap_superadmin(discord_id)` | premier superadmin (§ 5.5) | interne, `rtdash_owner` seulement |
 
-Les écritures simples d'une seule ligne (ajout d'un ticket, enregistrement du convoi, Actualiser, chemin de l'image, paramètres) sont faites directement par `supabase.from(...)` dans la Server Action, sous RLS et dans les colonnes autorisées.
+Les écritures simples d'une seule ligne (ajout d'un ticket, enregistrement du convoi, Actualiser, chemin de l'image, paramètres) sont faites directement par Kysely (`db.insertInto(...)`, `db.updateTable(...)`) dans la Server Action, sous RLS et dans les colonnes autorisées.
 
 ### 6.4 Triggers
 | Trigger | Tables | Rôle |
 |---|---|---|
-| `forbid_delete` (BEFORE DELETE) | toutes les tables métier | `raise exception 'Suppression interdite'` (R-AUD-01), même pour `service_role` |
+| `forbid_delete` (BEFORE DELETE) | toutes les tables métier | `raise exception 'Suppression interdite'` (R-AUD-01), même pour `rtdash_owner` |
 | `activity_log_append_only` (BEFORE UPDATE/DELETE) | `activity_log` | l'historique ne se modifie jamais |
-| `set_actor_columns` (BEFORE INSERT/UPDATE) | tables métier | remplit `created_by` / `updated_by` avec `rtdash.current_app_user_id()` (lu dans le jeton) ; toute valeur envoyée par le client est ignorée |
+| `set_actor_columns` (BEFORE INSERT/UPDATE) | tables métier | remplit `created_by` / `updated_by` avec `rtdash.current_app_user_id()` (déduit de la session) ; toute valeur envoyée par le client est ignorée |
 | `ticket_guard` (BEFORE UPDATE) | `tickets` | refuse toute modification d'un ticket archivé (`archived_at` non null, **ou** départ + 6 h passé, sauf l'archivage lui-même) (R-ARC-05/07). Le motif de refus est imposé par la contrainte `refusal_needs_reason`. |
 | `audit_row` (AFTER INSERT/UPDATE, `security definer`) | `tickets`, `cities`, `countries`, `app_users`, `settings` | écrit une ligne `activity_log` avec les champs modifiés (ancien → nouveau), en ignorant `updated_at`, `updated_by`, `tmp_snapshot` et `tmp_fetched_at` |
 
 ### 6.5 Qui a fait quoi
-- **Acteur** : `rtdash.current_app_user_id()`, déduit de `auth.uid()` (jeton signé). Absent (job d'archivage, SQL manuel) → `null`, affiché « Système ».
-- **Action** : une fonction RPC la fixe avec `set_config('rtdash.action', 'accepted', true)` (valable pour sa transaction). Sinon, `audit_row` la déduit : ajout → `created` ; `tmp_fetched_at` modifié → `refreshed` ; seuls les pays modifiés → `country_set` ; sinon `updated`.
+- **Acteur** : `rtdash.current_app_user_id()`, déduit de la session vérifiée en base (§ 6.1). Absent (job d'archivage, SQL manuel) → `null`, affiché « Système ».
+- **Action** : une fonction SQL la fixe avec `set_config('rtdash.action', 'accepted', true)` (valable pour sa transaction). Sinon, `audit_row` la déduit : ajout → `created` ; `tmp_fetched_at` modifié → `refreshed` ; seuls les pays modifiés → `country_set` ; sinon `updated`.
 - **Détails** (ex. motif de refus) : passés de la même façon (`rtdash.details`).
 - Une modification produit **une** ligne d'historique : l'action plus tous les champs modifiés. Rien ne peut échapper au journal, même une modification faite à la main en SQL.
 
 ### 6.6 Verrous pour les tables et fonctions futures
-- **Droits par défaut** : toute nouvelle table, séquence ou fonction de `public` est fermée à `anon`, `authenticated` et `PUBLIC`. Il faut accorder chaque droit explicitement dans la migration.
-- **Test structurel pgTAP** (CI) : échoue si une table de `public` n'a pas la RLS activée, si `anon` a le moindre droit, si `authenticated` a `DELETE` ou `TRUNCATE`, si une colonne protégée (§ 6.2) est modifiable par `authenticated`, ou si une fonction `security definer` n'a pas de `search_path` fixé.
-- **Test REST** : la clé publique, sans session, interroge l'API Supabase et n'obtient rien.
+- **Droits par défaut** : toute nouvelle table, séquence ou fonction créée par `rtdash_owner` est fermée à `rtdash_app` et à `PUBLIC`. Il faut accorder chaque droit explicitement dans la migration.
+- **Test structurel pgTAP** (CI) : échoue si une table de `public` n'a pas la RLS activée, si `PUBLIC` a le moindre droit, si `rtdash_app` a `DELETE` ou `TRUNCATE`, possède un objet, contourne la RLS ou peut lire `rtdash.sessions`, si une colonne protégée (§ 6.2) est modifiable par `rtdash_app`, ou si une fonction `security definer` n'a pas de `search_path` fixé.
+- **Test « sans session »** (intégration) : avec le rôle `rtdash_app` et sans session (ou avec une session expirée, fermée ou inventée), aucune ligne métier n'est lisible et aucune écriture ne passe.
 
 ### 6.7 Affichage de l'historique
 `activity_log` → libellés français : table de correspondance champ → libellé (`departure_at` → « l'heure de départ ») et action → phrase (« a accepté le ticket · convoi créé »). Les dates sont reformatées en Europe/Paris. Exemple : « **Lina** a modifié l'heure de départ : 21:00 → 21:30 · 13 oct. 2026 · 09:18 ».
@@ -478,7 +492,7 @@ Les écritures simples d'une seule ligne (ajout d'un ticket, enregistrement du c
   - `route_image_tmp_url = event.map`
 - **Instantané** : `tmp_snapshot` garde la réponse **sans** `attendances.confirmed_users`, `unsure_users` ni `confirmed_vtcs`, ce qui évite de stocker des pseudos de tiers et du volume inutile.
 - **Actualiser** (R-TKT-30..32) : nouvelle récupération → `mapping` → `diff.ts` compare les seuls champs issus de l'API avec les valeurs actuelles → l'interface montre les différences à cocher → la Server Action applique la sélection et met à jour `tmp_snapshot` et `tmp_fetched_at` (le trigger d'audit en déduit l'action `refreshed`).
-- **Image** (Q-18) : à la **première** acceptation (`convoy_initialized_at` null), l'image `map` est copiée dans Storage (`route_image_path`), pour ne pas dépendre de TruckersMP par la suite. Le lien TruckersMP reste affiché partout en texte cliquable (R-TKT-06).
+- **Image** (Q-18) : à la **première** acceptation (`convoy_initialized_at` null), l'image `map` est copiée sur le volume des images de trajet (`route_image_path`), pour ne pas dépendre de TruckersMP par la suite. Le lien TruckersMP reste affiché partout en texte cliquable (R-TKT-06).
 - **API indisponible** (R-TKT-05) : sur erreur réseau, délai dépassé ou 5xx (après le nouvel essai), `addTicket` renvoie `{ kind: 'api_unavailable' }`. L'interface affiche alors le formulaire manuel (lien + nom, entreprise, date, RDV, départ ; villes et lieux facultatifs). Le ticket est créé avec `tmp_snapshot = null` et une pastille « Données TruckersMP manquantes ». « Actualiser » le complète plus tard, avec le même écran de différences. Sur 404 ou lien invalide : pas de formulaire manuel.
 - **Limites de débit** : non documentées publiquement (documentation inaccessible). Le volume est très faible (un appel par ajout ou actualisation), donc aucun cache n'est prévu.
 
@@ -715,7 +729,7 @@ select cron.schedule('rtdash-archive', '*/5 * * * *', $$select rtdash.archive_du
 - La lecture seule est effective dès l'échéance, grâce à `tickets_v.is_archived` et au trigger `ticket_guard` (R-ARC-07), même avant le passage du job.
 - Archivage manuel d'un refusé (R-ARC-04) : fonction SQL `archive_refused_ticket(id)`, appelée par une Server Action ; action `archived`, acteur = l'utilisateur.
 - La fonction `rtdash.archive_due_tickets()` est interne (schéma `rtdash`) : elle n'est pas appelable par l'API.
-- **Portabilité** : `pg_cron` existe sur Supabase. Si la base quitte un jour Supabase, deux options : activer `pg_cron` sur le nouveau Postgres, ou appeler `archive_due_tickets()` depuis un cron du conteneur. La fonction SQL ne change pas.
+- `pg_cron` est installé dans l'image de la base (`db/Dockerfile`) et chargé au démarrage (`shared_preload_libraries`). Les tâches tournent dans la base `rtdash`.
 
 ---
 
@@ -748,92 +762,94 @@ v1 : `convois.cities-pending` = villes distinctes (`name_key`) dont `*_country_i
 
 ## 13. Docker, configuration, portabilité
 
-### 13.1 Image
-`Dockerfile` en plusieurs étapes : `deps` (`pnpm install --frozen-lockfile`) → `build` (`next build`, standalone) → `runner` (`node:24-alpine` ou `-slim`, **utilisateur non root**, copie de `.next/standalone`, `.next/static` et `public`, `HEALTHCHECK` sur `/api/health`, `CMD ["node","server.js"]`). Il n'y a **aucune** variable au moment du build : la même image tourne partout. Retirer npm, corepack et yarn de l'image finale (L-06).
+### 13.1 Images
+- **Application** : `Dockerfile` en plusieurs étapes : `deps` (`pnpm install --frozen-lockfile`) → `build` (`next build`, standalone) → `runner` (`node:24-alpine` ou `-slim`, **utilisateur non root**, copie de `.next/standalone`, `.next/static` et `public`, `HEALTHCHECK` sur `/api/health`, `CMD ["node","server.js"]`). Il n'y a **aucune** variable au moment du build : la même image tourne partout. Retirer npm, corepack et yarn de l'image finale (L-06).
+- **Base** : `db/Dockerfile`, image officielle `postgres:17` (Debian, épinglée par empreinte, L-05) + paquets `postgresql-17-cron` et `postgresql-17-pgtap` (dépôt PGDG de l'image). `pg_cron` chargé par `shared_preload_libraries`, tâches dans la base `rtdash`. Scripts `db/init/` : au **premier** démarrage seulement, création de la base `rtdash` et des rôles `rtdash_owner` et `rtdash_app` avec leurs mots de passe lus dans l'environnement. Publiée sur GHCR comme l'application (`rt-dash-db`).
 
-### 13.2 `docker-compose.yml` (production)
+### 13.2 `docker-compose.yml` (production) **[PROPOSITION]**
 ```yaml
 services:
+  db:
+    image: ghcr.io/${GITHUB_OWNER}/rt-dash-db:${TAG:-latest}
+    environment: [POSTGRES_PASSWORD, RTDASH_OWNER_PASSWORD, RTDASH_APP_PASSWORD]
+    volumes: ["db_data:/var/lib/postgresql/data"]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    healthcheck: { test: ["CMD", "pg_isready", "-d", "rtdash"], interval: 10s }
+    # aucun port publié : joignable seulement par le réseau Docker interne
+  migrate:                       # lancé par le déploiement : docker compose run --rm migrate
+    image: ghcr.io/amacneil/dbmate@sha256:…
+    profiles: ["tools"]
+    environment: [DATABASE_URL=postgres://rtdash_owner:…@db:5432/rtdash]
+    volumes: ["./db/migrations:/db/migrations:ro"]
+    depends_on: { db: { condition: service_healthy } }
   app:
     image: ghcr.io/${GITHUB_OWNER}/rt-dash:${TAG:-latest}
     env_file: .env
     restart: unless-stopped
     read_only: true
     tmpfs: ["/tmp", "/app/.next/cache"]
+    volumes: ["route_images:/data/route-images"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    healthcheck: { test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"], interval: 30s }
+    depends_on: { db: { condition: service_healthy } }
   caddy:
-    image: caddy:2
+    image: caddy:2-alpine@sha256:…
     ports: ["80:80", "443:443"]
     volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
-    environment: [ "DOMAIN=${DOMAIN}" ]
-    depends_on: [app]
-    restart: unless-stopped
-volumes: { caddy_data: {}, caddy_config: {} }
+    depends_on: { app: { condition: service_healthy } }
+volumes: { db_data: {}, route_images: {}, caddy_data: {}, caddy_config: {} }
 ```
 `Caddyfile` : `{$DOMAIN} { reverse_proxy app:3000 }`. Le certificat HTTPS est obtenu automatiquement.
 
 ### 13.3 Variables d'environnement
 
-**Sur le VPS** (`.env`, droits 600) — l'application n'a besoin que de ceci :
+**Sur le VPS** (`.env`, droits 600, propriété de `deploy`) :
 
 | Variable | Rôle |
 |---|---|
 | `APP_URL` | URL publique (ex. `https://rt-dash.example.org`) |
 | `DOMAIN` | Domaine pour Caddy |
-| `SUPABASE_URL` | URL du projet Supabase |
-| `SUPABASE_ANON_KEY` | Clé publique (anon / publishable), utilisée **côté serveur** avec la session de l'utilisateur. Elle ne donne aucun accès sans compte RT-Dash actif (RLS). |
+| `DATABASE_URL` | Connexion de l'application : rôle `rtdash_app`, hôte `db` (réseau interne) |
+| `POSTGRES_PASSWORD`, `RTDASH_OWNER_PASSWORD`, `RTDASH_APP_PASSWORD` | Mots de passe des rôles Postgres (générés, longs, différents) |
+| `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | Application Discord (connexion, § 5.1) |
 | `TRUCKERSMP_API_URL` | `https://api.truckersmp.com/v2` |
 | `APP_TIMEZONE` | `Europe/Paris` |
-| `GITHUB_OWNER`, `TAG` | Image à déployer |
+| `GITHUB_OWNER`, `TAG` | Images à déployer |
 
-**Dans les secrets GitHub uniquement** (jamais sur le VPS, jamais dans le dépôt) :
+**Dans les secrets GitHub uniquement** (environnement `production`) :
 
 | Secret | Rôle |
 |---|---|
-| `DATABASE_URL_MIGRATIONS` | Connexion du propriétaire via le pooler en **mode session** (IPv4, L-02), pour `supabase db push --db-url` |
-| `DATABASE_URL_BACKUP` | Même connexion, pour `pg_dump` (§ 13.6) |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Copie du bucket pour les sauvegardes |
+| `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS` | Déploiement, migrations et sauvegardes, tous par SSH |
 | `BOOTSTRAP_SUPERADMIN_DISCORD_ID` | Premier superadmin (§ 5.5) : `640173855096307712` |
-| `BACKUP_AGE_PUBLIC_KEY` | Chiffrement des sauvegardes |
-| `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS` | Déploiement SSH |
+| `BACKUP_AGE_PUBLIC_KEY` | Chiffrement des sauvegardes (la clé privée reste chez l'utilisateur) |
 
-**En local** (`.env.local` et variables lues par `supabase/config.toml`, jamais commitées) : les mêmes variables que le VPS, pointant vers Supabase local, plus le Client ID et le Client Secret Discord pour l'authentification locale (§ 5.1).
+**En local** (`.env.development.local`, jamais commité) : `APP_URL=http://localhost:3000`, `DATABASE_URL` vers le Postgres local, `DISCORD_CLIENT_ID` et `DISCORD_CLIENT_SECRET`.
 
-En production, le Client ID et le Client Secret Discord sont configurés **dans Supabase**, pas dans l'application.
+### 13.4 Changer de VPS
+Les données (base et images de trajet) sont maintenant **sur le VPS**. Changer de serveur :
+1. Préparer le nouveau serveur (`scripts/vps/setup.sh`, § 13.7) ; copier `docker-compose.yml`, `Caddyfile` et `.env`.
+2. Arrêter l'application sur l'ancien serveur, lancer une dernière sauvegarde (§ 13.6).
+3. Restaurer cette sauvegarde sur le nouveau serveur (procédure du runbook, testée en T-11.8).
+4. Mettre à jour les secrets GitHub `VPS_*`, faire pointer le DNS vers la nouvelle IP, relancer le workflow « deploy ».
 
-### 13.4 Changer de VPS (aucune donnée sur le VPS)
-1. Installer Docker sur le nouveau serveur.
-2. Copier `docker-compose.yml`, `Caddyfile` et `.env`.
-3. Mettre à jour les secrets GitHub `VPS_HOST` et `VPS_SSH_KEY`.
-4. Faire pointer le DNS vers la nouvelle IP.
-5. Relancer le workflow « deploy ».
-
-Base et fichiers sont chez Supabase : rien à migrer. Si le **domaine** change : mettre à jour `APP_URL`, `DOMAIN` et les URLs de Supabase (§ 5.1).
+Si le **domaine** change : mettre à jour `APP_URL`, `DOMAIN` et la redirection Discord (§ 5.1).
 
 ### 13.5 Développement local
-`supabase start` (Supabase CLI, Docker) fournit **toute** la pile en local : Postgres, Auth (Discord compris), API REST, Storage, `pg_cron` (D-05).
-- `supabase db reset` : recrée la base locale à partir des migrations, puis de `supabase/seed.sql` (dont le premier superadmin local) ;
-- `pnpm db:types` : `supabase gen types typescript --local > src/core/supabase/database.types.ts` ;
-- `supabase test db` : tests pgTAP ;
-- `pnpm dev` : l'application, branchée sur Supabase local.
+Un seul conteneur : la base. `compose.dev.yml` lance l'image `db/` avec le port publié sur `127.0.0.1` uniquement.
+- `pnpm db:up` : démarre la base locale ;
+- `pnpm db:reset` : recrée la base locale, applique toutes les migrations, puis `db/seed.sql` (dont le premier superadmin local) ;
+- `pnpm db:migrate` : applique les nouvelles migrations ;
+- `pnpm db:types` : régénère `src/core/db/database.types.ts` (kysely-codegen) ;
+- `pnpm db:test` : tests pgTAP (`pg_prove` dans le conteneur) ;
+- `pnpm dev` : l'application, branchée sur la base locale.
 
-### 13.6 Plan Supabase gratuit : conséquences et parades
-D'après la documentation officielle de Supabase (« Project Pausing ») :
-- un projet gratuit est **mis en pause après 7 jours de faible activité** de la base. Quelques requêtes par jour suffisent à l'éviter ;
-- un projet en pause se **restaure depuis le tableau de bord pendant 1 an**.
-
-Les sources tierces consultées indiquent qu'il n'y a **aucune sauvegarde automatique** sur ce plan.
-
-Parades **[PROPOSITION]** :
-1. **Workflow `backup.yml`** (GitHub Actions, tous les jours à 04:00 UTC) :
-   - `pg_dump` des schémas applicatifs via `DATABASE_URL_BACKUP` ;
-   - copie des objets du bucket `route-images` ;
-   - le tout **chiffré** (`age`, clé publique en secret GitHub) et conservé en *artefact* GitHub pendant 30 jours (voir Q-T8 pour l'emplacement).
-2. **Activité quotidienne** : ce même workflow interroge la base chaque jour, ce qui devrait suffire à éviter la pause. Une semaine après la mise en route, on vérifie dans le tableau de bord Supabase que le projet n'est pas signalé comme inactif. L'utilisation normale du site produit aussi de l'activité.
-3. **Restauration testée** : `docs/runbook.md` décrit comment restaurer une sauvegarde dans un Postgres local. La procédure est testée une fois avant la mise en production (T-11.8).
-4. Pendant le développement, on travaille sur le Supabase **local**. Si le projet cloud passe en pause, il suffit de le restaurer depuis le tableau de bord.
+### 13.6 Sauvegardes (données sur le VPS) **[PROPOSITION]**
+Les données vivent sur le VPS : une sauvegarde quotidienne, chiffrée et **hors du VPS** est indispensable.
+1. **`scripts/vps/backup.sh`** (sur le VPS) : `pg_dump` (rôle `rtdash_owner`, format personnalisé) + archive du volume `route_images`, le tout chiffré avec `age` et la **clé publique**, écrit directement sur la sortie standard. Rien n'est écrit en clair sur le disque.
+2. **Workflow `backup.yml`** (GitHub Actions, tous les jours à 04:00 UTC, et à la main) : se connecte au VPS en SSH, lance le script, récupère le flux chiffré et le garde en *artefact* GitHub pendant **30 jours** (Q-T8). Seul du chiffré quitte le VPS. Actif quand la variable du dépôt `BACKUP_ENABLED` vaut `true` (après la mise en service, phase 11).
+3. **Restauration testée** : `docs/runbook.md` décrit la restauration dans une base neuve ; elle est testée avant la mise en production (T-11.8).
 
 ### 13.7 VPS Debian 12 (Q-T6)
 Système choisi : **Debian 12**, accès SSH **par clé**. Préparation, scriptée dans `scripts/vps/setup.sh` et décrite dans le runbook :
@@ -851,19 +867,19 @@ Système choisi : **Debian 12**, accès SSH **par clé**. Préparation, scripté
 
 **En quelques lignes.** Le CI/CD est un robot, **GitHub Actions**, qui travaille à chaque fois que tu envoies du code sur GitHub :
 1. **CI (intégration continue)** : il installe le projet et lance les vérifications (style, types, tests, build). Si quelque chose échoue, tu le vois sur GitHub et **rien n'est déployé**.
-2. **CD (déploiement continu)** : quand la branche `main` est verte, il fabrique l'image Docker, la range dans le registre de GitHub (GHCR), applique les migrations de base avec la CLI Supabase, puis se connecte au VPS en SSH pour lancer `docker compose pull && docker compose up -d`.
+2. **CD (déploiement continu)** : quand la branche `main` est verte, il fabrique les images Docker (application et base), les range dans le registre de GitHub (GHCR), puis se connecte au VPS en SSH : il applique les migrations de la base (dbmate) et lance `docker compose pull && docker compose up -d`.
 
 Concrètement, tu pousses ton code et, quelques minutes plus tard, le site est à jour. Revenir en arrière consiste à redéployer l'image d'un commit précédent.
 
 | Workflow | Déclencheur | Étapes |
 |---|---|---|
-| `ci.yml` | chaque push, toutes branches (une pull request affiche les résultats du push de sa branche, sans double exécution) | `pnpm install` → lint → `tsc` → **contrôles de sécurité** (gitleaks, `pnpm audit`, absence de `NEXT_PUBLIC_`) → tests unitaires (dont la **matrice des droits**) → tests de la base (**Supabase local** lancé par la CLI, `supabase db reset`, puis **pgTAP** `supabase test db` et tests d'intégration Vitest ; L-07) → **types à jour** (les types générés doivent être identiques à ceux du dépôt) → `next build` → **tests e2e** (en-têtes de sécurité, sur le build de production) → build de l'image + scan Trivy |
-| `deploy.yml` | push sur `main` (après la CI) ; aussi lançable à la main avec un `TAG` | build de l'image, push `ghcr.io/<owner>/rt-dash:<sha>` et `:latest` → `supabase db push --db-url "$DATABASE_URL_MIGRATIONS"` → `rtdash.bootstrap_superadmin(...)` (sans effet s'il existe déjà) → SSH sur le VPS : `TAG=<sha> docker compose pull app && docker compose up -d` → contrôle de `/api/health` |
-| `backup.yml` | tous les jours (cron) ; aussi lançable à la main | `pg_dump` + copie du bucket → chiffrement → artefact 30 jours ; maintient aussi le projet Supabase actif (§ 13.6) |
+| `ci.yml` | chaque push, toutes branches (une pull request affiche les résultats du push de sa branche, sans double exécution) | `pnpm install` → lint → `tsc` → **contrôles de sécurité** (gitleaks, `pnpm audit`, absence de `NEXT_PUBLIC_`) → tests unitaires (dont la **matrice des droits**) → tests de la base (image `db/` construite et lancée, migrations rejouées depuis zéro, **pgTAP** et tests d'intégration Vitest ; L-07) → **types à jour** (les types générés doivent être identiques à ceux du dépôt) → `next build` → **tests e2e** (en-têtes de sécurité, sur le build de production) → build de l'image + scan Trivy |
+| `deploy.yml` | push sur `main` (après la CI) ; aussi lançable à la main avec un `TAG` | build des images, push `ghcr.io/<owner>/rt-dash:<sha>` et `rt-dash-db:<sha>` (+ `:latest`) → SSH sur le VPS : copie des migrations, `TAG=<sha> docker compose pull`, `docker compose run --rm migrate up`, `rtdash.bootstrap_superadmin(...)` (sans effet s'il existe déjà), `docker compose up -d` → contrôle de `/api/health` |
+| `backup.yml` | tous les jours (cron) ; aussi lançable à la main | SSH sur le VPS → `scripts/vps/backup.sh` (base + images, chiffrées sur le VPS) → artefact 30 jours (§ 13.6) ; actif avec `BACKUP_ENABLED` |
 
-- Secrets GitHub (environnement `production`) : voir § 13.3. `VPS_KNOWN_HOSTS` contient l'empreinte SSH du VPS, vérifiée à chaque connexion. GHCR utilise le `GITHUB_TOKEN`. Variables (non secrètes) du dépôt : `APP_URL` (contrôle de `/api/health` après déploiement) et `DEPLOY_ENABLED` (`true` à partir de la phase 11 : active les étapes migration et SSH de `deploy.yml`). La clé **privée** de déchiffrement des sauvegardes reste chez toi, hors de GitHub.
+- Secrets GitHub (environnement `production`) : voir § 13.3. `VPS_KNOWN_HOSTS` contient l'empreinte SSH du VPS, vérifiée à chaque connexion. GHCR utilise le `GITHUB_TOKEN`. Variables (non secrètes) du dépôt : `APP_URL` (contrôle de `/api/health` après déploiement) `DEPLOY_ENABLED` (`true` à partir de la phase 11 : active les étapes SSH de `deploy.yml`) et `BACKUP_ENABLED` (`true` une fois le VPS en service : active `backup.yml`). La clé **privée** de déchiffrement des sauvegardes reste chez toi, hors de GitHub.
 - Migrations **compatibles avec la version précédente** (on ajoute d'abord, on retire plus tard), puisqu'elles passent avant le déploiement de la nouvelle image.
-- Protéger `main` (règle « Protection de main », en place depuis le 2026-10-15) : on travaille sur une branche, on ouvre une pull request, les 3 vérifications de la CI doivent être vertes avant la fusion ; commits signés obligatoires ; ni réécriture de l'historique ni suppression de `main`.
+- Protection de `main` : **reportée par l'utilisateur le 2026-11-08** (travail en solo, pas de pull request ; T-1.2). Sur le nouveau dépôt, aucune règle n'est active. Si elle est posée un jour : vérifications de la CI obligatoires, commits signés, ni réécriture de l'historique ni suppression de `main`.
 
 ---
 
@@ -872,13 +888,13 @@ Concrètement, tu pousses ton code et, quelques minutes plus tard, le site est �
 | Niveau | Outil | Contenu |
 |---|---|---|
 | Unitaires | Vitest | **golden** `buildConvoyMessage` vs `message-convoi-exemple.md` (octet par octet) ; conversions Europe/Paris, dont les changements d'heure (29/03/2026, 25/10/2026, heures inexistantes ou ambiguës) ; `parse-url` ; `mapping` avec `truckersmp-event-36491.json` (entreprise vide, DLCs « Aucun », départ 21H30, RDV 20H30) ; DLCs non vides ; matrice des droits (`permissionsOf`) et `canApplyUserChange` ; normalisation et résolution des villes (inconnue, unique, homonyme, mémorisation) ; `diff` d'Actualiser |
-| Base de données | **pgTAP** (`supabase test db`) + Vitest, sur Supabase local (CLI), en CI comme sur le poste | **règles RLS rôle par rôle** (chaque rôle, compte désactivé, non enregistré, `anon`) ; test structurel (§ 6.6) ; **concordance** des droits TypeScript ↔ SQL et des règles d'administration (§ 5.4) ; colonnes protégées non modifiables ; suppression refusée ; `activity_log` en ajout seul ; ligne d'audit avec acteur et changements ; acteur absent = Système ; toutes les transitions de statut permises sauf sur un ticket archivé ; motif obligatoire à chaque refus ; données du convoi conservées après « désacceptation » ; ticket archivé non modifiable (y compris échéance passée sans job) ; `archive_due_tickets` ; unicité de l'événement actif ; propagation d'une ville apprise |
+| Base de données | **pgTAP** (`pnpm db:test`) + Vitest, sur l'image `db/` (Postgres 17 + pg_cron), en CI comme sur le poste | **sessions** (valide, expirée, fermée, inventée) ; **règles RLS rôle par rôle** (chaque rôle, compte désactivé, non enregistré, sans session) ; test structurel (§ 6.6) ; **concordance** des droits TypeScript ↔ SQL et des règles d'administration (§ 5.4) ; colonnes protégées non modifiables ; suppression refusée ; `activity_log` en ajout seul ; ligne d'audit avec acteur et changements ; acteur absent = Système ; toutes les transitions de statut permises sauf sur un ticket archivé ; motif obligatoire à chaque refus ; données du convoi conservées après « désacceptation » ; ticket archivé non modifiable (y compris échéance passée sans job) ; `archive_due_tickets` ; unicité de l'événement actif ; propagation d'une ville apprise |
 | Composants | Vitest + Testing Library | l'aperçu rend l'exemple (gras « Date : », 6 codes en ligne, citation, lien, pas de HTML brut) ; pays inconnu → « pays à compléter » |
 | Visuel | Playwright (captures) | aperçu Discord comparé à la capture de référence (validation humaine) ; écrans vs maquette |
-| Bout en bout | Playwright + Supabase local | accès refusé ; parcours ajout → prise en charge → acceptation → modification → historique ; refus avec motif ; pop-up des villes ; archive en lecture seule |
+| Bout en bout | Playwright + base locale (image `db/`) | accès refusé ; parcours ajout → prise en charge → acceptation → modification → historique ; refus avec motif ; pop-up des villes ; archive en lecture seule |
 | Contrat API | job manuel / hebdomadaire | appel réel `GET /v2/events/36491` et validation du schéma Zod, pour détecter un changement de l'API |
 
-Connexion Discord en bout en bout **[PROPOSITION]** : on ne peut pas automatiser un vrai login Discord. On utilise une connexion de test qui **n'existe que** si `E2E_TEST_AUTH=1` et `NODE_ENV !== 'production'`. Le serveur **refuse de démarrer** en production si cette variable est présente, et un test de la CI le vérifie.
+Connexion en bout en bout **[PROPOSITION]** : on ne peut pas automatiser un vrai login Discord. Les tests Playwright créent eux-mêmes une session **directement dans la base de test** (rôle `rtdash_owner`) et posent le cookie correspondant. L'application ne contient donc **aucune** route ni variable de connexion de test : rien à désactiver en production (remplace l'ancien `E2E_TEST_AUTH`).
 
 ---
 
@@ -892,13 +908,13 @@ Connexion Discord en bout en bout **[PROPOSITION]** : on ne peut pas automatiser
 |---|---|---|---|
 | 1 | **Serveur (VPS)** | Debian, SSH par clé uniquement, root désactivé, pare-feu (22/80/443), `fail2ban`, mises à jour de sécurité automatiques. Seul Caddy est exposé ; l'application n'écoute que sur le réseau Docker interne. | Script de préparation idempotent ; scan des ports depuis l'extérieur au premier déploiement (T-11.4). |
 | 2 | **Transport et en-têtes** | HTTPS automatique (Caddy), HSTS, CSP stricte avec nonce, `frame-ancestors 'none'`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`. | Test e2e qui vérifie la présence et la valeur de chaque en-tête. |
-| 3 | **Authentification** | Discord via Supabase Auth, aucun mot de passe local. Cookies `httpOnly`, `Secure`, `SameSite=Lax`. La session est **validée auprès de Supabase** à chaque requête (`getUser()`, ou `getClaims()` selon la version de `@supabase/ssr`), jamais lue sans vérification. | Tests de `getViewer()` : sans session, session expirée, compte absent, compte désactivé → aucun accès. |
-| 4 | **Autorisation** | **Deux barrières.** (1) Next.js : toute Server Action est construite avec `defineAction({ permission, input, run })`, qui fait dans l'ordre session → `getViewer()` → droit → validation Zod → exécution avec le client Supabase de l'utilisateur. (2) Postgres : la RLS revérifie le droit sur chaque ligne (§ 6). Pages : garde dans le layout + `requirePermission` par page. CSRF : contrôle d'origine des Server Actions, fait **par défaut** par Next.js (origine = domaine du site). `serverActions.allowedOrigins` n'est volontairement pas défini : il ne sert qu'à autoriser d'autres origines et serait figé au build (décidé le 2026-10-15). | (a) Un test parcourt **tous** les fichiers `actions/` et échoue si une action exportée n'utilise pas `defineAction`. (b) **Test de la matrice des droits** : chaque action × chaque rôle (+ comptable, + compte désactivé, + non enregistré) → autorisé ou refusé, comparé à specs § 2.2. Un oubli fait échouer la CI. |
+| 3 | **Authentification** | Discord OAuth2 (code + `state` + PKCE), aucun mot de passe local ; jetons Discord jamais stockés. Cookie de session `__Host-` `httpOnly`, `Secure`, `SameSite=Lax` ; la base ne garde que l'empreinte du jeton. La session est **vérifiée par la base** à chaque requête (`rtdash.use_session`), jamais lue sans vérification. | Tests du flux (state invalide, code refusé, profil Discord invalide) ; pgTAP des sessions ; tests de `getViewer()` : sans session, session expirée ou fermée, compte absent, compte désactivé → aucun accès. |
+| 4 | **Autorisation** | **Deux barrières.** (1) Next.js : toute Server Action est construite avec `defineAction({ permission, input, run })`, qui fait dans l'ordre session → `getViewer()` → droit → validation Zod → exécution dans une transaction portant la session de l'utilisateur. (2) Postgres : la RLS revérifie le droit sur chaque ligne (§ 6). Pages : garde dans le layout + `requirePermission` par page. CSRF : contrôle d'origine des Server Actions, fait **par défaut** par Next.js (origine = domaine du site). `serverActions.allowedOrigins` n'est volontairement pas défini : il ne sert qu'à autoriser d'autres origines et serait figé au build (décidé le 2026-10-15). | (a) Un test parcourt **tous** les fichiers `actions/` et échoue si une action exportée n'utilise pas `defineAction`. (b) **Test de la matrice des droits** : chaque action × chaque rôle (+ comptable, + compte désactivé, + non enregistré) → autorisé ou refusé, comparé à specs § 2.2. Un oubli fait échouer la CI. |
 | 5 | **Entrées** | Zod sur toute entrée (actions, routes, réponses TruckersMP) ; longueurs maximales sur tous les textes ; identifiants validés (UUID) ; `` ` `` refusé dans les champs en code (R-CNV-09). | Tests unitaires des schémas. |
-| 6 | **Base de données** | RLS sur toutes les tables, par droit (`rtdash.has_permission`) ; `anon` sans aucun droit ; `authenticated` sans `DELETE` ni `TRUNCATE`, et seulement sur les colonnes autorisées ; colonnes de parcours et de traçabilité modifiables uniquement par fonctions SQL et triggers ; exécution des fonctions retirée à `PUBLIC` ; fonctions `security definer` avec `search_path` fixé. Triggers : pas de suppression, archives figées, historique automatique avec l'auteur lu dans le jeton. | Tests pgTAP rôle par rôle ; test structurel (§ 6.6) ; test REST avec la clé publique ; test de concordance TypeScript ↔ SQL (§ 5.4). |
-| 7 | **Fichiers envoyés** | Type vérifié sur les premiers octets (PNG, JPEG, WebP), 8 Mo maximum, **image ré-encodée côté serveur** (supprime métadonnées et contenus cachés), nom généré par le serveur, bucket privé, URL signée valable 5 minutes. | Tests avec un faux PNG (script renommé), un fichier trop gros, une image avec métadonnées. |
+| 6 | **Base de données** | RLS sur toutes les tables, par droit (`rtdash.has_permission`) ; l'application se connecte avec `rtdash_app` (sans contournement de la RLS, sans `DELETE` ni `TRUNCATE`, seulement sur les colonnes autorisées) et les migrations avec `rtdash_owner` ; identité déduite par la base du jeton de session (§ 6.1) ; base joignable seulement par le réseau Docker interne ; colonnes de parcours et de traçabilité modifiables uniquement par fonctions SQL et triggers ; exécution des fonctions retirée à `PUBLIC` ; fonctions `security definer` avec `search_path` fixé. Triggers : pas de suppression, archives figées, historique automatique avec l'auteur déduit de la session. | Tests pgTAP rôle par rôle ; test structurel (§ 6.6) ; test « sans session » ; test de concordance TypeScript ↔ SQL (§ 5.4). |
+| 7 | **Fichiers envoyés** | Type vérifié sur les premiers octets (PNG, JPEG, WebP), 8 Mo maximum, **image ré-encodée côté serveur** (supprime métadonnées et contenus cachés), nom généré par le serveur, fichier sur un volume privé, servi uniquement par une route qui relit le ticket sous RLS (`convoys:read`), avec `Cache-Control: private, no-store`. | Tests avec un faux PNG (script renommé), un fichier trop gros, une image avec métadonnées. |
 | 8 | **Affichage** | React échappe tout. Aucun `dangerouslySetInnerHTML`. L'aperçu Markdown produit des éléments React. Liens externes limités à `http(s)` avec `rel="noopener noreferrer"`. | Règle ESLint `react/no-danger` en erreur ; test de l'aperçu avec une valeur contenant du HTML. |
-| 9 | **Secrets** | Aucune variable `NEXT_PUBLIC_*`. La clé `service_role` n'existe que dans les secrets GitHub, **jamais** sur le VPS ni dans le code de l'application. Secrets du VPS dans `.env` (droits 600). La clé privée des sauvegardes reste hors de GitHub. | La CI échoue si `NEXT_PUBLIC_` ou `SERVICE_ROLE` apparaît dans `src/` ; **gitleaks** en CI détecte un secret commité. |
+| 9 | **Secrets** | Aucune variable `NEXT_PUBLIC_*`. Secrets du VPS (mots de passe Postgres, secret Discord) dans `.env` (droits 600), jamais dans l'image ni dans le dépôt. L'application ne connaît que le mot de passe de `rtdash_app`. La clé privée des sauvegardes reste hors de GitHub et du VPS. | La CI échoue si `NEXT_PUBLIC_` apparaît dans `src/` ; **gitleaks** en CI détecte un secret commité. |
 | 10 | **Dépendances et image** | Fichier de verrouillage figé, **Dependabot** (alertes + mises à jour), `pnpm audit --audit-level=high` bloquant (exceptions nominatives seulement, justifiées et datées dans `pnpm-workspace.yaml`, ex. `braces` sans correctif publié au 2026-10-15), image Docker scannée par **Trivy** (npm, corepack et yarn retirés de l'image finale). Actions GitHub et images des scanners **épinglées par empreinte** (SHA / digest), jamais par étiquette ; Dependabot avec un délai de 3 jours avant de proposer une nouvelle version. | Étapes bloquantes de `ci.yml`. |
 | 11 | **Conteneur** | Utilisateur non root, système de fichiers en lecture seule (tmpfs pour `/tmp` et le cache Next), aucune capacité Linux (`cap_drop: [ALL]`), `no-new-privileges`. | Vérifié par un test sur la configuration `docker compose`. |
 | 12 | **Abus** | Limite de débit par utilisateur sur l'ajout de ticket, « Actualiser » et la connexion (ex. 20 par minute) **[PROPOSITION]**. | Test unitaire du limiteur. |
@@ -909,8 +925,9 @@ Connexion Discord en bout en bout **[PROPOSITION]** : on ne peut pas automatiser
 - Revue de sécurité outillée (commande `/security-review` de Claude Code + passage de la liste ci-dessus, ligne par ligne).
 - Tests d'attaque simples, notés dans un rapport :
   - appel direct de chaque Server Action avec chaque rôle et sans session ;
-  - appel direct de l'API Supabase **avec un vrai jeton** de chaque rôle (contournement de Next.js) : lecture, écriture de colonnes protégées, appel des fonctions ;
-  - lecture via l'API REST Supabase avec la clé publique, sans session ;
+  - requêtes SQL directes avec le rôle `rtdash_app` et **une vraie session** de chaque rôle (contournement de Next.js) : lecture, écriture de colonnes protégées, appel des fonctions ;
+  - requêtes SQL avec `rtdash_app` sans session, avec une session expirée, fermée ou inventée ;
+  - port Postgres injoignable depuis l'extérieur ;
   - envoi d'un fichier piégé ;
   - en-têtes HTTP ;
   - scan des ports du VPS.
@@ -924,23 +941,24 @@ Les questions fonctionnelles sont dans [specs § 13–14](specs.md).
 
 | # | Sujet | Décision |
 |---|---|---|
-| Q-T1 | Accès aux données | **Révisée le 2026-11-02** : Supabase « classique » (`supabase-js` côté serveur avec la session de l'utilisateur, RLS par rôle, fonctions SQL, CLI Supabase). Remplace Drizzle (décision du 2026-10-14). |
+| Q-T1 | Accès aux données | **Révisée le 2026-11-08 (D-06)** : Kysely côté serveur, chaque transaction portant la session de l'utilisateur ; RLS par droit, fonctions SQL, migrations dbmate. Remplace Supabase « classique » (2026-11-02), qui remplaçait Drizzle (2026-10-14). |
 | Q-T2 | Règles dans la base | Oui : RLS, droits par colonne, triggers et contraintes en plus du code (non-suppression, archives figées, motif de refus, audit). |
-| Q-T3 | Plan Supabase | **Gratuit**, avec les parades du § 13.6. |
+| Q-T3 | Hébergement de la base | **Révisée le 2026-11-08 (D-06)** : Postgres dans Docker sur le VPS, sauvegardes quotidiennes chiffrées hors du VPS (§ 13.6). Remplace le plan Supabase gratuit. |
 | Q-T4 | Emojis de l'aperçu | Twemoji (attribution CC-BY dans « À propos »). |
-| Q-T5 | Connexion de test e2e | Oui, impossible en production (§ 15). |
+| Q-T5 | Connexion de test e2e | **Révisée le 2026-11-08** : sessions de test créées directement dans la base de test par Playwright ; aucune route de test dans l'application (§ 15). |
 | Q-T6 | VPS | **Debian 12**, accès SSH par clé (§ 13.7). |
 | Q-T7 | Préproduction | Non en v1 : local + production. |
 | Q-T8 | Emplacement des sauvegardes | Artefacts GitHub chiffrés, 30 jours ; en télécharger une de temps en temps. |
-| P2-a | Base des tests d'intégration (2026-10-15) | **Supabase local** (CLI) en CI, comme sur le poste : Auth, API REST, Storage, `pg_cron`, rôles `anon` / `authenticated`. |
-| P2-b | Bucket `route-images` (2026-10-15) | Créé (privé) par migration dès la phase 2, pour que la sauvegarde soit complète et testable tout de suite. |
+| P2-a | Base des tests d'intégration (2026-10-15, révisée le 2026-11-08) | L'image `db/` (Postgres 17 + pg_cron + pgTAP) en CI comme sur le poste, avec les rôles `rtdash_owner` et `rtdash_app`. |
+| P2-b | Images de trajet (2026-10-15, révisée le 2026-11-08) | Volume Docker `route_images` servi par une route qui vérifie le droit ; plus de bucket Supabase. |
 | P2-c | Tables et fonctions futures | Droits par défaut fermés + test structurel pgTAP + test REST (§ 6.6). |
 | Q-17 | ProMods (2026-10-15) | Pas d'extraction : `countries` a `source`, `name_key` et `game_token` facultatif pour les pays appris (R-CITY-12). |
 | D-01 | Redémarrage (2026-11-02) | Le code de la première tentative (phases 1 et 2, sur Drizzle) est abandonné ; le développement reprend de zéro dans un nouveau dossier à partir de ces documents. Les comptes externes de la phase 0 sont conservés. |
 | D-02 | Lisibilité du code (2026-11-02) | Exigence au même titre que la sécurité : conventions et garde-fous du § 3.2. |
 | D-03 | Comptes rendus (2026-11-02) | Un compte rendu par tâche, regroupé dans `docs/comptes-rendus/phase-N.md`, plus un bilan de fin de phase (tasks.md, « Mode d'emploi »). |
 | D-04 | Périmètre strict (2026-11-02) | Une tâche ne modifie que ce qu'elle doit modifier. Tout autre changement est signalé dans le compte rendu et attend l'accord de l'utilisateur. |
-| D-05 | Développement local (2026-11-02) | Supabase local **complet**, Auth Discord compris (`config.toml` + redirection `127.0.0.1:54321`). Avec la RLS, la base et l'authentification doivent venir de la même instance, sinon les jetons ne sont pas reconnus. |
+| D-05 | Développement local (2026-11-02, révisée le 2026-11-08) | Base locale = même image `db/` que la production (`compose.dev.yml`), connexion Discord réelle avec la redirection `http://localhost:3000/auth/callback`. |
+| D-06 | Abandon de Supabase (2026-11-08) | Demande de l'utilisateur : une pile plus propre, sans les nombreux services Supabase inutiles. **Next.js full-stack + Postgres seul dans Docker** (pas d'API séparée : une API NestJS ne se justifierait que pour d'autres clients, ex. le bot v2, et pourra s'ajouter plus tard). Accès Kysely, migrations dbmate, connexion Discord et sessions gérées par l'application, images sur un volume, sauvegardes par SSH. Le code Supabase des tâches T-2.1 à T-2.5 (commits `3725605`, `6d0f81e`) est remplacé ; le projet Supabase cloud (T-0.2) n'est plus utilisé. |
 
 ---
 
@@ -950,11 +968,11 @@ Les questions fonctionnelles sont dans [specs § 13–14](specs.md).
 
 | # | Leçon | Où elle s'applique |
 |---|---|---|
-| L-01 | L'ID Discord fiable est dans `auth.identities` (`provider = 'discord'`, `provider_id`), aussi exposé côté client dans `identities[].identity_data.provider_id`. **Jamais `user_metadata`**, modifiable par l'utilisateur. | § 5.3 |
-| L-02 | La connexion « directe » à la base Supabase n'existe qu'en IPv6 ; le pooler (`aws-0-eu-west-1.pooler.supabase.com`, mode session, port 5432) fonctionne en IPv4. Les runners GitHub n'ont pas d'IPv6 : la CI utilise le pooler. | § 13.3, § 14 |
-| L-03 | Supabase ajoute toujours le scope `email` à la connexion Discord. Écart accepté ; l'e-mail n'est jamais lu par RT-Dash. | § 5.1 |
+| L-01 | Ne jamais lire l'identité dans une donnée que l'utilisateur peut modifier (en 2026-10 : `user_metadata` de Supabase). Depuis D-06 : l'ID Discord est lu par le serveur sur `GET /users/@me` avec le jeton obtenu à l'échange du code, puis gardé dans la session en base. | § 5.3 |
+| L-02 | *(Sans objet depuis D-06.)* La connexion directe à Supabase cloud n'existait qu'en IPv6 ; les runners GitHub passaient par le pooler en IPv4. Leçon générale : vérifier l'accès réseau réel de la CI avant d'en dépendre. | § 13.3, § 14 |
+| L-03 | *(Sans objet depuis D-06.)* Supabase ajoutait toujours le scope `email` ; avec Discord OAuth direct, seul `identify` est demandé. | § 5.1 |
 | L-04 | Next.js vérifie déjà l'origine des Server Actions. Ne pas définir `serverActions.allowedOrigins` : il ne sert qu'à autoriser d'autres origines et serait figé au build. | § 16.1, couche 4 |
 | L-05 | Actions GitHub et images des scanners épinglées par empreinte (SHA / digest) ; Dependabot attend 3 jours avant de proposer une nouvelle version. | § 14, § 16.1, couche 10 |
 | L-06 | `pnpm audit` bloquant : les exceptions sont nominatives, justifiées et datées dans `pnpm-workspace.yaml`. Il faut aussi retirer npm, corepack et yarn de l'image finale pour que Trivy passe. | § 16.1, couche 10 |
-| L-07 | Les tests d'intégration ont besoin de Supabase local complet (pas d'un Postgres nu) : `pg_cron`, rôles `anon` / `authenticated`, API REST. | § 14, § 15 |
+| L-07 | Les tests d'intégration ont besoin d'une base complète, identique à la production (pas d'un Postgres nu) : `pg_cron`, pgTAP, rôles `rtdash_owner` et `rtdash_app`. D'où l'image `db/` commune au poste, à la CI et au VPS. | § 14, § 15 |
 | L-08 | La CI se lance sur chaque push, toutes branches. Une pull request affiche les résultats du push de sa branche, sans double exécution. | § 14 |

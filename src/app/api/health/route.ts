@@ -1,8 +1,8 @@
-import { isSupabaseReachable } from "@/core/supabase/supabase-health";
+import { isDatabaseReachable } from "@/core/db/database-health";
 
 export async function GET() {
-  if (await isSupabaseReachable()) {
-    return Response.json({ status: "ok", supabase: "ok" });
+  if (await isDatabaseReachable()) {
+    return Response.json({ status: "ok", database: "ok" });
   }
-  return Response.json({ status: "error", supabase: "unreachable" }, { status: 503 });
+  return Response.json({ status: "error", database: "unreachable" }, { status: 503 });
 }

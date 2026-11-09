@@ -4,5 +4,5 @@ out
 coverage
 pnpm-lock.yaml
 docs
-src/core/supabase/database.types.ts
+src/core/db/database.types.ts
 CLAUDE.md

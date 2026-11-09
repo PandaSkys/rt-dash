@@ -1,6 +1,6 @@
 # RT-Dash
 
-Dashboard d'administration d'une VTC Euro Truck Simulator 2 (TruckersMP). Next.js full-stack (TypeScript), Supabase « classique » (Postgres + RLS + Auth Discord + Storage, client `supabase-js` côté serveur), Docker, GitHub Actions.
+Dashboard d'administration d'une VTC Euro Truck Simulator 2 (TruckersMP). Next.js full-stack (TypeScript), **Postgres 17 seul dans Docker** (RLS, fonctions SQL, triggers, pg_cron ; accès par Kysely côté serveur ; migrations dbmate), connexion Discord OAuth2 et sessions gérées par l'application, images sur un volume Docker, Docker Compose, GitHub Actions. **Pas de Supabase** (design D-06).
 
 ## Documents fondateurs (à lire avant toute tâche)
 
@@ -10,7 +10,7 @@ Dashboard d'administration d'une VTC Euro Truck Simulator 2 (TruckersMP). Next.j
 - [docs/comptes-rendus/](docs/comptes-rendus/) : un compte rendu par phase (modèle : `_modele.md`)
 - [docs/prompts-phases.md](docs/prompts-phases.md) : prompt de démarrage de chaque phase
 
-**Statut : révision 1.0 du 2026-11-02** (reprise du code de zéro, Supabase classique, méthode de travail). Suivre `docs/tasks.md` phase par phase, dans l'ordre. Toute modification de règle passe d'abord par une mise à jour des documents, validée par l'utilisateur.
+**Statut : révision 1.1 du 2026-11-08, validée le 2026-11-09** (abandon de Supabase, D-06 ; révision 1.0 du 2026-11-02 : reprise du code de zéro, méthode de travail). Suivre `docs/tasks.md` phase par phase, dans l'ordre. Toute modification de règle passe d'abord par une mise à jour des documents, validée par l'utilisateur.
 
 ## Ressources visuelles (à consulter à chaque étape d'interface)
 
@@ -39,10 +39,10 @@ Dashboard d'administration d'une VTC Euro Truck Simulator 2 (TruckersMP). Next.j
 - **Sécurité = exigence forte** (design.md § 6 et § 16), avec **deux barrières** :
   - Next.js : toute Server Action passe par `defineAction` ; le test de la matrice des droits doit couvrir chaque nouvelle action ;
   - Postgres : RLS sur chaque table, colonnes de parcours modifiables seulement par fonctions SQL, droits par défaut fermés, tests pgTAP rôle par rôle.
-  Le client Supabase est toujours créé **côté serveur avec la session de l'utilisateur**. La clé `service_role` n'apparaît **jamais** dans `src/` ni sur le VPS. Jamais de `NEXT_PUBLIC_*` ni de `dangerouslySetInnerHTML`. L'ID Discord se lit dans `auth.identities`, **jamais** dans `user_metadata`.
+  La base n'est accessible que **côté serveur**, avec le rôle restreint `rtdash_app`, et toute requête faite pour un utilisateur passe par `withSession` (la base vérifie elle-même le jeton de session). La base n'est jamais exposée hors du réseau Docker. Le rôle `rtdash_owner` (migrations) n'est jamais utilisé par l'application. Jamais de `NEXT_PUBLIC_*` ni de `dangerouslySetInnerHTML`. L'ID Discord vient uniquement de `GET /users/@me` côté serveur, gardé dans la session ; **jamais** d'une donnée envoyée par le navigateur.
 - Droits rangés **par outil** : les rôles propriétaires gèrent leur outil et ses paramètres ; direction et superadmin gèrent tout, sauf les paramètres dangereux réservés au superadmin. La matrice existe en TypeScript et en SQL ; le test de concordance doit rester vert.
-- **Historique automatique** : les triggers enregistrent chaque modification (acteur lu dans le jeton, action, ancien → nouveau). Les changements de statut passent par les fonctions SQL dédiées.
-- Schéma, RLS et fonctions uniquement dans `supabase/migrations/` ; types générés par `pnpm db:types`, jamais écrits à la main.
+- **Historique automatique** : les triggers enregistrent chaque modification (acteur déduit de la session, action, ancien → nouveau). Les changements de statut passent par les fonctions SQL dédiées.
+- Schéma, RLS et fonctions uniquement dans `db/migrations/` ; types générés par `pnpm db:types`, jamais écrits à la main.
 - Dates stockées en UTC, affichées et saisies en **Europe/Paris** (changement d'heure géré).
 - Message Discord : **une seule** fonction `buildConvoyMessage`, pour l'aperçu et pour le futur bot (v2).
 - Tests d'abord pour la logique pure et métier (Vitest, pgTAP). Le test golden du message doit rester vert.
